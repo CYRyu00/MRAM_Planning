@@ -1,13 +1,9 @@
 function plot_tree(x_opt,u_opt, N_st,N_u,dt,N,slow_factor)
-N_st = 4;N_u=2;
 x=x_opt;
 u=u_opt;
 robot = generate_model_1AM();
-%%
 
-%close all
-
-figure
+figure('Position',[100,100,1000,600])
 x0=[0,-pi/2,0,0]';
 show(robot,x(1,1:2)'+x0(1:2));
 
@@ -27,7 +23,8 @@ r = params(8);
 A = [r r -r -r;-r r r -r;mu -mu mu -mu; zeros(2,4);ones(1,4)];
 
 ax.View =[0,0];
-axis([-0.5 5 -0.5 0.5])
+axis([-0.5 max(x_opt(:,1))+0.5 -0.5 0.5])
+
 for i = 1:N
     show(robot,x(i,1:2)'+ x0(1:2),'PreservePlot',false);
     drawnow

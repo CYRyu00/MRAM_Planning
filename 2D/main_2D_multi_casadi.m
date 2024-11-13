@@ -9,44 +9,67 @@ I0 = I(2,2);
 thrust_limit = 0.15 ;
 m0 = 0.028;
 mu = 0.005964552;
-r = 0.092*sqrt(2)/4;
+r = 0.092*sqrt(2)/4;%0.032
 d = 0.1;
-lg = 0.05; % custom
+lg = 0.08; % custom
 g=9.81;
 m1 = 0.2; m2 = 0.1; lp = 0.2; l1 = lp+lg;
 c_cart = 100e-2; 
 c_pole = 100e-5; 
 
+global params
+params = [m1, m2, lp, lg, m0, I(2,2),mu,r,d];
 dt = 0.05;
-%dt = 0.05;
-nx = 4;
-nu = 4;
 N = 100;
-%%
+
+%distance from box to CoM of each AM
+
+Max_serial_num = 4;
+L = (lp+lg):d:(lp+lg + (Max_serial_num-1)*d);
+
+
+num_up = [3 1 4];  %[3 3 1];
+
+num_AMs = sum(num_up);
+nx = 4;
+nu = length(num_up)*2;
+
+
 x = MX.sym('x');
 dx = MX.sym('dx');
 theta = MX.sym('theta');
 dtheta = MX.sym('dtheta');
 q = [x; theta; dx ;dtheta];
 
-f1 = MX.sym('f1');
-f2 = MX.sym('f2');
-u = [f1;f2];
-%%
-    
+u = MX.sym('u', length(num_up)*2, 1);
+%% Dynamics
 % q1 q2 q1dot q2dot
-M = [m1+m2+m0, (m2*lp+m0*l1)*cos(q(2));(m2*lp+m0*l1)*cos(q(2)) , m2*lp^2+m0*l1^2+I0];
-C = [0 , -(m2*lp+m0*l1)*sin(q(2))*q(4); 0 0];
-G = [0 ; (m2*lp+m0*l1)*g*sin(q(2))];
+
+term1 = m1 + m2;
+term2 = m2*lp;
+term3 = m2*lp^2;
+for i=1:length(num_up)
+    term1 = term1 + m0 *num_up(i) ;
+    term2 = term2 + m0*L(i) *num_up(i);
+    term3 = term3 + (m0*L(i)^2 + I0) *num_up(i);
+end
+% q1 q2 q1dot q2dot
+M = [term1, term2*cos(q(2));term2*cos(q(2)) , term3];
+C = [0 , -term2*sin(q(2))*q(4); 0 0];
+G = [0 ; term2*g*sin(q(2))];
+    
 
 %Calculate Generalized force
-A = [0 0;-2*r 2*r; 0 0; 0 ];
-F_b = A*u;% [moment ; force]
-R = [-sin(q(2)) 0 cos(q(2)); 0 -1 0; cos(q(2)) 0 sin(q(2))];
-f_w = R*F_b(4:6);
-J = [0 0;0 1;0 0; 1 l1*cos(q(2)); 0 0; 0 l1*sin(q(2))];
-tau = J'*[F_b(1:3);f_w];
+A = [0 0;-2*r 2*r; 0 0; 0 0; 0 0 ; 2 2];
+tau = 0;
 
+for i=1:length(num_up)
+    F_b = A*u(2*i-1:2*i)*num_up(i);% [moment ; force]
+    R = [-sin(q(2)) 0 cos(q(2)); 0 -1 0; cos(q(2)) 0 sin(q(2))];
+    f_w = R*F_b(4:6);
+    J = [0 0;0 1;0 0; 1 L(i)*cos(q(2)); 0 0; 0 L(i)*sin(q(2))];
+    tau = tau + J'*[F_b(1:3);f_w];
+end
 
 q_dot = [q(3:4); M\(tau - C*q(3:4)-G)];
 q_damp = [0;0;-c_cart*q(3); -c_pole*q(4)];
@@ -60,26 +83,29 @@ opt_variables = [reshape(X, nx*(N+1), 1); reshape(U, nu*N, 1)];
 %%
 obj = 0;
 g = [];
-Q = diag([1,1,1,1])*0.1;
-R = diag([1,1,1,1]);
+Q = diag(ones(length(x),1))*0.1;
+R = diag(reshape([num_up; num_up], 1, []))*2;
 x_init = MX.sym('x_init', nx);
 X(:,1) = x_init;
 x_0 = [0;0;0;0];
 x_f = [3;pi/3;0;0];
-u_max = thrust_limit*10e10;
-u_min = -thrust_limit*0;
+u_max = thrust_limit *1;
+u_min = thrust_limit *(-0);
 
 for k = 1:N
   % obj = obj + (X(:,k)-x_f)'*Q*(X(:,k)-x_f);
   Q = diag([0,0,1,1])*0.1;
   obj = obj + (X(:,k))'*Q*(X(:,k));
-
   obj = obj + U(:,k)'*R*U(:,k);
-  g = [g; X(:,k+1) - f(X(:,k), U(:,k)); -X(:,k+1) + f(X(:,k), U(:,k))]; % dynamics constraint
-  g = [g;  u_min - U(1,k);  u_min - U(2,k) ;  u_min - U(3,k);  u_min - U(4,k)];
-  g = [g;  -u_max +  U(1,k);  -u_max +  U(2,k) ;  -u_max +  U(3,k);  -u_max + U(4,k)];
+
+  % dynamics constraint
+  g = [g; X(:,k+1) - f(X(:,k), U(:,k)); -X(:,k+1) + f(X(:,k), U(:,k))]; 
+  %Inequality Constraints
+  for i=1:length(num_up)
+      g = [g;  u_min*ones(2,1) - U(2*i-1:2*i,k)];
+      g = [g; -u_max*ones(2,1) + U(2*i-1:2*i,k)];
+  end
 end
-%g = [g; X(:,1) - x_0; - X(:,1) + x_0];
 g = [g; X(:,N+1) - x_f; - X(:,N+1) + x_f];
 
 %%
@@ -93,8 +119,8 @@ nlp_opts.print_time = 1;
 
 solver = nlpsol('solver', 'ipopt', nlp_prob, nlp_opts);
 
-x0 = [0; 0; 0; 0];
-u0 = [0; 0; 0; 0];
+zero_xs = zeros(length(x),1);
+zero_us = zeros(length(u),1);
 
 x_interp = zeros(N+1, 4);
 vel_x = (x_f(1) - x_0(1))/(N*dt) ;
@@ -108,13 +134,13 @@ for i = 1:(N+1)
 
 end
 
-X0 = [reshape(x_interp',(N+1)*4,1);repmat(u0, N, 1)];
+X_init_guess = [reshape(x_interp',(N+1)*4,1);repmat(zero_us, N, 1)];
 %[x_fmincon(1,:)';reshape(x_fmincon,N*4,1);reshape(u_fmincon,N*4,1)];
 %[reshape(x_interp',(N+1)*4,1);repmat(u0, N, 1)];
-%[repmat(x0, N+1, 1); repmat(u0, N, 1)]
+%[repmat(zero_xs, N+1, 1); repmat(zero_us, N, 1)]
 %[x_fmincon(1,:)';reshape(x_fmincon,N*4,1);reshape(u_fmincon,N*4,1)];
 %% solve
-sol = solver('x0',  X0, ... 
+sol = solver('x0',  X_init_guess, ... 
              'p', x_0,...
              'lbx', -inf, 'ubx', inf,...
              'lbg', -inf, 'ubg', 0);
@@ -124,70 +150,11 @@ sol = solver('x0',  X0, ...
 solution = full(sol.x);
 x_opt = reshape(solution(1:4*(N+1)), nx, N+1)';
 u_opt = reshape(solution(4*(N+1)+1:end), nu, N)';
-%% Plot the results
-T = dt * N;
-% state
-t = (0:1:N)*dt;
-figure(2)
-subplot(2,2,1)
-plot(t, x_opt(:,1),'.-')
-ylabel("x1")
-axis tight
+%% Plot
+close all
+plot_multi_results(x_opt, u_opt,dt,N,L,num_up);
+%% Video
+slow_factor = 1;
+force_scale = 2;
 
-subplot(2,2,2)
-plot(t, x_opt(:,2),'.-')
-ylabel("x2")
-
-axis tight
-subplot(2,2,3)
-plot(t,x_opt(:,3),'.-')
-ylabel("x3")
-axis tight
-
-subplot(2,2,4)
-plot(t, x_opt(:,4),'.-')
-ylabel("x4")
-axis tight;
-
-%% Inputs
-figure(3)
-t = (1:1:N)*dt;
-subplot(2,2,1)
-plot(t, u_opt(:,1),'.-')
-ylabel("f1")
-title("Inputs - AM1")
-axis tight
-
-subplot(2,2,2)
-plot(t, u_opt(:,2),'.-')
-ylabel("f2")
-
-axis tight
-subplot(2,2,3)
-plot(t,u_opt(:,3),'.-')
-ylabel("f3")
-
-axis tight
-subplot(2,2,4)
-plot(t, u_opt(:,4),'.-')
-ylabel("f4")
-axis tight;
-%%
-taus = zeros(N,2);
-Fs = zeros(N,6);
-
-for i= 1:N
-    tau_ = get_tau(x_opt(i,:)',u_opt(i,:)');
-    taus(i,:)= tau_';
-end
-%%
-
-figure(4);
-subplot(2,1,1)
-plot(t,taus(:,1),'.-');
-
-title("tau1")
-subplot(2,1,2)
-plot(t,taus(:,2),'.-');
-
-title("tau2")
+plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L,num_up)
