@@ -150,6 +150,15 @@ sol = solver('x0',  X_init_guess, ...
 solution = full(sol.x);
 x_opt = reshape(solution(1:4*(N+1)), nx, N+1)';
 u_opt = reshape(solution(4*(N+1)+1:end), nu, N)';
+% Get the informations
+optimal_value = full(sol.f);
+exit_flag = solver.stats.return_status;
+processing_time = solver.stats.t_wall_total;
+
+% Display the results
+fprintf('Optimal objective value: %f\n', optimal_value);
+fprintf('Exit flag: %s\n', exit_flag);
+fprintf('Processing time: %.4f seconds\n', processing_time);
 %% Plot
 close all
 plot_multi_results(x_opt, u_opt,dt,N,L,num_up);

@@ -1,4 +1,4 @@
-function plot_tree_multi(x_opt,u_opt, dt,N,slow_factor,scale, L,num_up,dohold)
+function plot_tree_multi(x_opt,u_opt, dt,N,slow_factor,scale, L,num_up)
 x=x_opt;
 u=u_opt;
 robot = generate_model_multi_AMs(L,num_up);
@@ -22,7 +22,7 @@ r = params(8);
 A = [r r -r -r;-r r r -r;mu -mu mu -mu; zeros(2,4);ones(1,4)];
 
 ax.View =[0,0];
-axis([-0.5 max(x_opt(:,1))+0.5 -0.5 0.5])
+axis([-0.5 max(x_opt(:,1))+0.5 -1 1 -1 1])
 
 for i = 1:N
     
