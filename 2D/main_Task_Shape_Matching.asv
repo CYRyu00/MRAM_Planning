@@ -1,0 +1,142 @@
+%Define Dynamcis and 
+mass_scale = 5;
+define_global_params(mass_scale);
+[m1, m2, lp, lg, m0, I0,mu,r,d,g,c_cart,c_pole,thrust_limit] = get_global_params();
+
+num_AMs = 20;
+max_serial_num = 10;
+L_arr = (lp+lg):d:(lp+lg + (max_serial_num -1)*d);
+shapes = make_configurations(num_AMs,max_serial_num);
+disp(length(shapes))
+%%
+x_0 = [0;0;0;0];
+x_f = [3;pi/3;0;0];
+u_max = thrust_limit *1;
+u_min = thrust_limit *(-0);
+dt = 0.05;
+N = 100;
+
+iter = length(shapes);
+% Preallocate cell arrays or structures to store results
+all_x_opt = cell(iter, 1);  % Store x_opt for each iteration
+all_u_opt = cell(iter, 1);  % Store u_opt for each iteration
+all_optimal_value = cell(iter, 1);  % Store optimal_value for each iteration
+all_exit_flag = cell(iter, 1);  % Store exit_flag for each iteration
+all_processing_time = cell(iter, 1);  % Store processing_time for each iteration
+
+% setting for initial guess
+x_interp = zeros(N+1, 4);
+vel_x = (x_f(1) - x_0(1))/(N*dt) ;
+vel_theta = (x_f(2) - x_0(2))/(N*dt);
+for j = 1:4
+    x_interp(:, j) = linspace(x_0(j), x_f(j), N+1)';
+end
+for j = 1:(N+1)
+    x_interp(j, 3:4) = [vel_x;vel_theta];
+end
+load('1AM_solution.mat')
+zero_xs = zeros(length(4),1);
+
+%% nlp for each shape
+tic;
+for i =1:iter
+    num_up = cell2mat(shapes(i));
+    fprintf('Start shape %d / %d\n', i,iter);
+    fprintf('Shape: ');
+    disp(num_up);
+    N_u = length(num_up)*2;
+    % Make Initial guess of solution
+    
+    zero_us = zeros(N_u,1);
+    
+    X_init_guess = [reshape(x_interp',(N+1)*4,1);repmat(zero_us, N, 1)];  % 61.510837 seconds
+    
+    %u_guess = repmat(u_opt_1AM/num_AMs,1,length(num_up));
+    %X_init_guess = [reshape(x_opt_1AM',(N+1)*4,1);reshape(u_guess',N*N_u,1)]; %58.197548  seconds
+    
+    %X_init_guess = [reshape(x_opt_1AM',(N+1)*4,1);repmat(zero_us, N, 1)]; %57.201678  seconds
+    %if i == 1 
+    %    X_init_guess = [reshape(x_opt_1AM',(N+1)*4,1);repmat(zero_us, N, 1)];
+    %else
+    %    X_init_guess = [reshape(x_opt',(N+1)*4,1);repmat(zero_us, N, 1)]; %55.101723  sec
+    %end
+
+    %Solve NLP
+    [x_opt, u_opt, optimal_value,exit_flag,processing_time] ...
+        = solve_nlp(num_up,L_arr,u_min,u_max,x_0,x_f,X_init_guess,dt,N);
+
+    % Save results for this iteration
+    all_x_opt{i} = x_opt;
+    all_u_opt{i} = u_opt;
+    all_optimal_value{i} = optimal_value;
+    all_exit_flag{i} = exit_flag;
+    all_processing_time{i} = processing_time;
+    fprintf('exit flag: %d\n', exit_flag);
+end
+elapsed_time = toc;  
+fprintf('Total time: %f seconds\n', elapsed_time);
+%% Save the result
+%save('10_10_optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
+save('20_10_optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
+%% Find best and worst Shape
+% Convert cell arrays to numeric arrays (assuming they are numeric)
+all_optimal_value_array = cell2mat(all_optimal_value);
+all_exit_flag_array = cell2mat(all_exit_flag);  % Assuming exit_flag is numeric
+
+% Find the indices where exit_flag == 1
+valid_indices = find(all_exit_flag_array == 1);
+
+% If there are valid indices (exit_flag == 1)
+if ~isempty(valid_indices)
+    % Filter the optimal values corresponding to exit_flag == 1
+    valid_optimal_values = all_optimal_value_array(valid_indices);
+    
+    % Find the minimum value and its index in the filtered values
+    [min_value, local_min_index] = min(valid_optimal_values);
+    
+    % Convert local_min_index to the global index
+    global_min_index = valid_indices(local_min_index);
+    
+    % Find the maximum value and its index in the filtered values
+    [max_value, local_max_index] = max(valid_optimal_values);
+    
+    % Convert local_max_index to the global index
+    global_max_index = valid_indices(local_max_index);
+   
+    % Extract the corresponding best and worst num_up
+    best_num_up = cell2mat(result(global_min_index));
+    worst_num_up = cell2mat(result(global_max_index));
+    
+    % Display the results
+    fprintf('Best Shape (Min) is %.4f at global index %d\n', min_value, global_min_index);
+    fprintf('Best Shape: ');
+    disp(best_num_up);
+    
+    fprintf('Worst Shape (Max) is %.4f at global index %d\n', max_value, global_max_index);
+    fprintf('Worst Shape: ');
+    disp(worst_num_up);
+else
+    fprintf('No valid exit_flag == 1 found.\n');
+end
+
+%% Plot
+index = global_min_index;
+x_opt = cell2mat(all_x_opt(index));
+u_opt = cell2mat(all_u_opt(index));
+num_up = cell2mat(result(index));
+
+figure 
+subplot(2,1,1)
+plot(all_optimal_value_array)
+title("object function value")
+subplot(2,1,2)
+plot(all_exit_flag_array,'*')
+title("exit flag")
+%% plot
+close all
+plot_multi_results(x_opt, u_opt,dt,N,L_arr,num_up);
+%% Video
+slow_factor = 1;
+force_scale = 2;
+
+plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L_arr,num_up)

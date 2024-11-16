@@ -1,5 +1,9 @@
-function define_global_params()
+function define_global_params(scale)
 % Parameters
+if nargin < 1
+        scale = 1; % Default value if scale is not provided
+end
+
 I = [16.571710 0.830806 0.718277;
      0.830806 16.655602 1.800197;
      0.718277 1.800197 29.261652]*10e-6;
@@ -11,7 +15,7 @@ r = 0.092*sqrt(2)/4;%0.032
 d = 0.1;
 lg = 0.08; % custom
 g=9.81;
-m1 = 0.2; m2 = 0.1; lp = 0.2; l1 = lp+lg;
+m1 = 0.2*scale; m2 = 0.1*scale; lp = 0.2; l1 = lp+lg;
 c_cart = 100e-2; 
 c_pole = 100e-5; 
 global params

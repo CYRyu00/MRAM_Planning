@@ -19,10 +19,11 @@ rate = rateControl(framesPerSecond);
 global params
 mu = params(7);
 r = params(8);
+d = params(9);
 A = [r r -r -r;-r r r -r;mu -mu mu -mu; zeros(2,4);ones(1,4)];
 
 ax.View =[0,0];
-axis([-0.5 max(x_opt(:,1))+0.5 -1 1 -1 1])
+axis([-0.5 max(x_opt(:,1))+0.5+d*length(num_up) -1 1 -1 1])
 
 for i = 1:N
     
@@ -55,7 +56,7 @@ for i = 1:N
             ax = gca;
             ax.Projection = 'orthographic';
             ax.View =[0,0];
-            axis([-0.5 max(x_opt(:,1))+0.5 -0.5 0.5])
+            axis([-0.5 max(x_opt(:,1))+1.0 -0.5 0.5])
         end
     end
 

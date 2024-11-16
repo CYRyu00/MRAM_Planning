@@ -1,17 +1,18 @@
-function result = make_configurations(num_AMs, max_L)
-    % This is the main function that calls the helper function findCombinations
-    result = findCombinations(num_AMs, max_L);
+function result = make_configurations(num_AMs, max_serial, max_parallel)
+    % Main function to call the helper function findCombinations
+    result = findCombinations(num_AMs, max_serial, max_parallel);
 end
 
-function valid_L = findCombinations(num_AMs, max_L)
+function valid_L = findCombinations(num_AMs, max_serial, max_parallel)
     % Helper function to find combinations of partitions
-    all_combinations = partition(num_AMs, max_L);
+    all_combinations = partition(num_AMs, max_serial);
     valid_L = {};
     
     % Filter combinations to meet the conditions
     for i = 1:length(all_combinations)
         L = all_combinations{i};
-        if sum(L) == num_AMs && all(L > 0) && length(L) <= max_L
+        % Add the constraint that each element in L must be <= max_parallel
+        if sum(L) == num_AMs && all(L > 0) && length(L) <= max_serial && all(L <= max_parallel)
             valid_L{end+1} = L; %#ok<AGROW> Append valid combination
         end
     end

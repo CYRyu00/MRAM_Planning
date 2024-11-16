@@ -1,21 +1,23 @@
 %Define Dynamcis and 
-define_global_params();
+mass_scale = 5;
+define_global_params(mass_scale);
 [m1, m2, lp, lg, m0, I0,mu,r,d,g,c_cart,c_pole,thrust_limit] = get_global_params();
 
-num_AMs = 10;
-max_serial_num = 10;
+num_AMs = 12;
+max_serial_num = 12;
+max_parallel_num = 12;
 L_arr = (lp+lg):d:(lp+lg + (max_serial_num -1)*d);
-result = make_configurations(num_AMs,max_serial_num);
-disp(length(result))
+shapes = make_configurations(num_AMs,max_serial_num,max_parallel_num);
+disp(length(shapes))
 %%
 x_0 = [0;0;0;0];
 x_f = [3;pi/3;0;0];
-u_max = thrust_limit *1e10;
+u_max = thrust_limit *1;
 u_min = thrust_limit *(-0);
 dt = 0.05;
 N = 100;
 
-iter = length(result);
+iter = length(shapes);
 % Preallocate cell arrays or structures to store results
 all_x_opt = cell(iter, 1);  % Store x_opt for each iteration
 all_u_opt = cell(iter, 1);  % Store u_opt for each iteration
@@ -39,7 +41,7 @@ zero_xs = zeros(length(4),1);
 %% nlp for each shape
 tic;
 for i =1:iter
-    num_up = cell2mat(result(i));
+    num_up = cell2mat(shapes(i));
     fprintf('Start shape %d / %d\n', i,iter);
     fprintf('Shape: ');
     disp(num_up);
@@ -74,8 +76,10 @@ for i =1:iter
 end
 elapsed_time = toc;  
 fprintf('Total time: %f seconds\n', elapsed_time);
+%% Save the result
 %save('10_10_optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
-save('optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
+file_name = sprintf("%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
+save(file_name, 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time','elapsed_time');
 %% Find best and worst Shape
 % Convert cell arrays to numeric arrays (assuming they are numeric)
 all_optimal_value_array = cell2mat(all_optimal_value);
@@ -102,8 +106,8 @@ if ~isempty(valid_indices)
     global_max_index = valid_indices(local_max_index);
    
     % Extract the corresponding best and worst num_up
-    best_num_up = cell2mat(result(global_min_index));
-    worst_num_up = cell2mat(result(global_max_index));
+    best_num_up = cell2mat(shapes(global_min_index));
+    worst_num_up = cell2mat(shapes(global_max_index));
     
     % Display the results
     fprintf('Best Shape (Min) is %.4f at global index %d\n', min_value, global_min_index);
@@ -121,15 +125,20 @@ end
 index = global_min_index;
 x_opt = cell2mat(all_x_opt(index));
 u_opt = cell2mat(all_u_opt(index));
-num_up = cell2mat(result(index));
+num_up = cell2mat(shapes(index));
 
-figure 
-plot(all_optimal_value_array)
-%% plot
 close all
-%plot_multi_results(x_opt, u_opt,dt,N,L_arr,num_up);
+figure 
+subplot(2,1,1)
+plot(all_optimal_value_array)
+title("object function value")
+subplot(2,1,2)
+plot(all_exit_flag_array,'*')
+title("exit flag")
+%% plot
+plot_multi_results(x_opt, u_opt,dt,N,L_arr,num_up);
 %% Video
 slow_factor = 1;
 force_scale = 2;
 
-%plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L_arr,num_up)
+plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L_arr,num_up)
