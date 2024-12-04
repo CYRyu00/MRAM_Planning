@@ -1,6 +1,7 @@
 function plot_tree_multi(x_opt,u_opt, dt,N,slow_factor,scale, L,num_up)
 x=x_opt;
 u=u_opt;
+
 robot = generate_model_multi_AMs(L,num_up);
 
 figure('Position',[100,100,1000,600])

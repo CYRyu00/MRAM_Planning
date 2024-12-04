@@ -1,22 +1,23 @@
 %Define Dynamcis and 
-mass_scale = 5;
+mass_scale = 1;
+thrust_scale = 10;
 define_global_params(mass_scale);
 [m1, m2, lp, lg, m0, I0,mu,r,d,g,c_cart,c_pole,thrust_limit] = get_global_params();
 
-num_AMs = 12;
-max_serial_num = 12;
-max_parallel_num = 12;
+num_AMs = 8;
+max_serial_num = num_AMs; %10;
+max_parallel_num = num_AMs;%10;
 L_arr = (lp+lg):d:(lp+lg + (max_serial_num -1)*d);
 shapes = make_configurations(num_AMs,max_serial_num,max_parallel_num);
-disp(length(shapes))
-%%
+%disp(length(shapes)) 2^n-1
+
 x_0 = [0;0;0;0];
 x_f = [3;pi/3;0;0];
-u_max = thrust_limit *1;
+u_max = thrust_limit *thrust_scale;
 u_min = thrust_limit *(-0);
 dt = 0.05;
 N = 100;
-
+%%
 iter = length(shapes);
 % Preallocate cell arrays or structures to store results
 all_x_opt = cell(iter, 1);  % Store x_opt for each iteration
@@ -78,8 +79,11 @@ elapsed_time = toc;
 fprintf('Total time: %f seconds\n', elapsed_time);
 %% Save the result
 %save('10_10_optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
-file_name = sprintf("%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
-save(file_name, 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time','elapsed_time');
+file_name = sprintf("%d_%d_%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num,mass_scale,thrust_scale);
+%elapsed_time = sum(cell2mat(all_processing_time));
+global params
+save(file_name, 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time','elapsed_time','shapes'...
+    ,'params','L_arr','x_0','x_f','u_min','u_max','dt','N','mass_scale','thrust_scale');
 %% Find best and worst Shape
 % Convert cell arrays to numeric arrays (assuming they are numeric)
 all_optimal_value_array = cell2mat(all_optimal_value);
@@ -130,7 +134,7 @@ num_up = cell2mat(shapes(index));
 close all
 figure 
 subplot(2,1,1)
-plot(all_optimal_value_array)
+plot(all_optimal_value_array,'.-')
 title("object function value")
 subplot(2,1,2)
 plot(all_exit_flag_array,'*')
