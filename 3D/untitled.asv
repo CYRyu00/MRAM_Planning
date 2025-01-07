@@ -1,0 +1,69 @@
+
+labeledMap = [0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              5, 0, 0, 0, 0;
+              4, 3, 0, 0, 0;
+              1, 2, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0;
+              0, 0, 0, 0, 0];
+m=max(labeledMap,[],"all");
+AIM=[];
+
+%function neighbors = findLabelNeighborsSingle(labeledMap)
+    % Input:
+    %   labeledMap - A 2D matrix with unique positions for each label
+    % Output:
+    %   neighbors - A struct where each label maps to its neighboring labels
+
+    % Get unique labels (excluding 0)
+    uniqueLabels = unique(labeledMap);
+    uniqueLabels(uniqueLabels == 0) = []; % Remove 0 (background)
+    uniqueLabels = 1:1:m;
+
+    % Initialize the neighbors struct
+    neighbors = struct();
+
+    % Define movement directions: [Right, Down, Left, Up]
+    directions = [0, 1; 1, 0; 0, -1; -1, 0];
+    
+    % Iterate over each label
+    for label = uniqueLabels
+        % Find the position of the current label
+        [row, col] = find(labeledMap == label);
+        
+        % Initialize neighbor set
+        neighborSet = [];
+        
+        % Check neighbors
+        for d = 1:size(directions, 1)
+            newRow = row + directions(d, 1);
+            newCol = col + directions(d, 2);
+            
+            % Ensure the neighbor is within bounds
+            if newRow >= 1 && newRow <= size(labeledMap, 1) && ...
+               newCol >= 1 && newCol <= size(labeledMap, 2)
+                neighborLabel = labeledMap(newRow, newCol);
+                
+                % Add to neighbors if it's non-zero and not the current label
+                if neighborLabel ~= 0 && neighborLabel ~= label
+                    neighborSet = unique([neighborSet, neighborLabel]);
+                    
+                    newAIM = zeros(m,1);
+                    if d == [1, 0]
+                        a = +1;
+                    elseif d ==[-1,0]
+                        a=
+                    AIM = [AIM ,newAIM];
+                end
+            end
+        end
+        
+        % Assign neighbors to the current label
+        neighbors.(sprintf('Label_%d', label)) = neighborSet;
+    end
+%end
+disp(neighbors);
