@@ -1,4 +1,4 @@
-function AIM = generateAIM(labeledMap)
+function AIM = generateAIM(M, labeledMap)
     m=max(labeledMap,[],"all");
     uniqueLabels = 1:1:m;
     
@@ -29,7 +29,7 @@ function AIM = generateAIM(labeledMap)
                 if neighborLabel ~= 0 && neighborLabel ~= label
                     neighborSet = unique([neighborSet, neighborLabel]);
                     
-                    newAIM = zeros(m,1);
+                    newAIM = zeros(M,1);
                     if directions(d,:) == [1, 0]
                         a = +1;
                     elseif directions(d,:) ==[-1,0]
