@@ -1,10 +1,14 @@
 %Define Dynamcis and 
-mass_scale = 1;
-thrust_scale = 10;
-define_global_params(mass_scale);
+for i=1:1:8
+object_mass_scale = 2;
+AM_mass_scale = 1;
+thrust_scale = 1;
+define_global_params(object_mass_scale);
 [m1, m2, lp, lg, m0, I0,mu,r,d,g,c_cart,c_pole,thrust_limit] = get_global_params();
+scale_d = 3;
+d = d*scale_d;
 
-num_AMs = 8;
+num_AMs = i;
 max_serial_num = num_AMs; %10;
 max_parallel_num = num_AMs;%10;
 L_arr = (lp+lg):d:(lp+lg + (max_serial_num -1)*d);
@@ -15,6 +19,8 @@ x_0 = [0;0;0;0];
 x_f = [3;pi/3;0;0];
 u_max = thrust_limit *thrust_scale;
 u_min = thrust_limit *(-0);
+m0=m0*AM_mass_scale;
+I0=I0*AM_mass_scale;
 dt = 0.05;
 N = 100;
 %%
@@ -79,11 +85,13 @@ elapsed_time = toc;
 fprintf('Total time: %f seconds\n', elapsed_time);
 %% Save the result
 %save('10_10_optimization_results.mat', 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time');
-file_name = sprintf("%d_%d_%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num,mass_scale,thrust_scale);
+file_name = sprintf("mass_scale_2/scale_d=3_%d_%d_%d_optimization_results.mat", num_AMs,object_mass_scale, AM_mass_scale);
 %elapsed_time = sum(cell2mat(all_processing_time));
 global params
 save(file_name, 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time','elapsed_time','shapes'...
-    ,'params','L_arr','x_0','x_f','u_min','u_max','dt','N','mass_scale','thrust_scale');
+    ,'params','L_arr','x_0','x_f','u_min','u_max','dt','N','object_mass_scale','AM_mass_scale','thrust_scale');
+
+end
 %% Find best and worst Shape
 % Convert cell arrays to numeric arrays (assuming they are numeric)
 all_optimal_value_array = cell2mat(all_optimal_value);

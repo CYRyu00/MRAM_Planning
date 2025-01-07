@@ -22,6 +22,7 @@ function  robot = generate_model_1AM()
     joint1.JointAxis = [1 0 0];
     joint1.HomePosition = 0.2;
     body1.Joint = joint1;
+    addVisual(body1,"Box",[0.1 0.1 0.1])
     addBody(robot, body1, 'base');
     
     body2 = rigidBody('link');
@@ -40,6 +41,7 @@ function  robot = generate_model_1AM()
     joint3 = rigidBodyJoint('fix1','fixed');
     setFixedTransform(joint3, trvec2tform([lp, 0, 0]));
     body3.Joint = joint3;
+    addVisual(body3,"Sphere",0.03)
     addBody(robot, body3, 'link');
     
     body4 = rigidBody('AM1');
@@ -49,6 +51,7 @@ function  robot = generate_model_1AM()
     tform4 = [diag([-1,-1,1]), [lg;0;0];0 0 0 1 ];
     setFixedTransform(joint4, tform4);
     body4.Joint = joint4;
+    addVisual(body4,"Box",[2*r 2*r r/2])
     addBody(robot, body4, 'sphere');
     
     robot.Gravity = [0,0,-g];

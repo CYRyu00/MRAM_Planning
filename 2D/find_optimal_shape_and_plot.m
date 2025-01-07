@@ -1,4 +1,4 @@
-num_AMs = 8;
+num_AMs = 9;
 max_serial_num = num_AMs; % 12;
 max_parallel_num = num_AMs; % 12;
 file_name = sprintf("Planning_results/%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
@@ -79,9 +79,9 @@ index = global_max_index;
 x_opt2 = cell2mat(all_x_opt(index));
 u_opt2 = cell2mat(all_u_opt(index));
 num_up2 = cell2mat(shapes(index));
-plot_compare_results(x_opt1, u_opt1,dt,N,L_arr,num_up1,x_opt2, u_opt2,num_up2);
+plot_compare_results_ver2(x_opt1, u_opt1,dt,N,L_arr,num_up1,x_opt2, u_opt2,num_up2);
 %% Video
 slow_factor = 1;
-force_scale = 1;
+force_scale = 0.1;
 
-plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L_arr,num_up)
+%plot_tree_multi(x_opt,u_opt,dt,N,slow_factor,force_scale,L_arr,num_up)

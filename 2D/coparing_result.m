@@ -2,10 +2,10 @@ num_AMs = 8;
 max_serial_num = num_AMs; %12;
 max_parallel_num = num_AMs; % 12;
 mass_scale = 1;
-file_name = sprintf("Planning_results/%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
-%file_name = sprintf("8_8_8_1_10_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
+%file_name = sprintf("Planning_results/%d_%d_%d_optimization_results.mat", num_AMs,max_serial_num,max_parallel_num);
+file_name = sprintf("mass_scale_2/7_2_1_optimization_results.mat");
 
-load(file_name);
+%load(file_name);
 %% Assume shapes is a cell array of combinations
 % Get the length of each combination
 shape_lengths = cellfun(@length, shapes);
@@ -30,35 +30,43 @@ hold on;
 blue_indices = sorted_exit_flag == 1;   % Logical array for blue points
 red_indices = sorted_exit_flag ~= 1;    % Logical array for red points
 
-plot(find(blue_indices), sorted_optimal_value(blue_indices), 'b.');
-plot(find(red_indices), sorted_optimal_value(red_indices), 'r.');
-plot(sorted_shape_lengths*10,'black')
+plot(find(blue_indices), sorted_optimal_value(blue_indices), 'bo');
+plot(find(red_indices), sorted_optimal_value(red_indices), 'ro');
+%plot(sorted_shape_lengths*10,'black')
 
 change_indices = find([true, diff(sorted_shape_lengths) ~= 0]);
 % Add vertical lines at the change indices
 for idx = change_indices
-    xline(idx, '--k', 'LineWidth', 0.5); % Dashed black vertical line
-     text(idx, sorted_shape_lengths(idx) * 10, ...
+    xline(idx-0.5, '--k', 'LineWidth', 0.5); % Dashed black vertical line
+    if (idx==1)
+        txt_disp = 1;
+    elseif(idx==2)
+        txt_disp = -0.5;
+    else 
+        txt_disp = 0;
+    end
+     text(idx-txt_disp, 40, ... %sorted_shape_lengths(idx) * 10, ...
         sprintf('%d', sorted_shape_lengths(idx)), ... % Text is the shape length
         'HorizontalAlignment', 'left', ...
-        'VerticalAlignment', 'top', ...
+        'VerticalAlignment', 'bottom', ...
         'FontSize', 12, ...
         'Color', 'b');
 end
 
 % Add labels and legend
-xlabel('Index');
+xlabel('Shape');
+%xlim([0, length(sorted_exit_flag)+2]);
+%ylim([40, 130])
 ylabel('Optimal Value');
-title('Optimal Values');
-legend('Feasible','Infeasible','Length x10');
+title('Object function Values for each Shape');
+legend('Feasible','Infeasible','Length');
 hold off;
-axis tight
+%axis tight
 %% Find best and worst Shape
 % Convert cell arrays to numeric arrays (assuming they are numeric)
 all_optimal_value_array = cell2mat(all_optimal_value);
 all_exit_flag_array = cell2mat(all_exit_flag);  % Assuming exit_flag is numeric
 valid_indices = find(all_exit_flag_array == 1);
-
 
 if ~isempty(valid_indices)
     valid_optimal_values = all_optimal_value_array(valid_indices);
