@@ -1,12 +1,30 @@
-m = 5;
-result = generateAllShapes(m);
-%disp(result(:,:,:)); % Displays the size of the 3D array
+m = 10;
+result = generateAllShapes(m);% Displays the size of the 3D array
 
-%AIM_Test = generateAIM(result(:,:,5));
-result_2 = labelNodes(result(:,:,10));
-disp(result_2);
-max(result_2,[],"all");
-
-result_3 = generateAIM(m, result_2);
-disp(result_3)
-
+shape =   ...
+ [   0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     1     1     1     0     0     0     0     0     0     0;
+     1     1     1     0     0     0     0     0     0     0;
+     1     1     1     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0;
+     0     0     0     0     0     0     0     0     0     0];
+for i=1:length(result)
+    if shape==result(:,:,i)
+        disp(i)
+    end
+end
