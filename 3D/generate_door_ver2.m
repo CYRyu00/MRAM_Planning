@@ -1,9 +1,9 @@
-function robot = generate_door_ver2(n,dh,r_i_ci, g, mass_list,inertia_list, do_view,q)
+function robot = generate_door_ver2(n,dh,r_i_ci,d, g, shape, mass_list,inertia_list, do_view,q)
 robot = rigidBodyTree('DataFormat','column','MaxNumBodies',n+1);
 robot.Gravity = g';
 
 % Example dimensions: [length, width, height]
-box_size = { [1, 0.02, 2], [0.15, 0.05, 0.03],[0.08, 0.02, 0.015],[0.2, 0.04, 0.4] ,[0.01,0.01,0.01]} ; 
+box_size = { [1, 0.02, 2], [0.15, 0.05, 0.03],[0.04, 0.04, 0.1],[d*0.9, 0.04, d*0.9] ,[0.01,0.01,0.01]} ; 
 
 % Build each link and joint
 for i = 1:4
@@ -32,9 +32,20 @@ for i = 1:4
     body.Inertia = [inertia_list{i}(1,1), inertia_list{i}(2,2), inertia_list{i}(3,3), 0, 0, 0]; % Ixx, Iyy, Izz, Ixy, Iyz, Ixz
     
     % Add visual box to the body
-    addVisual(body, 'Box', box_size{i},trvec2tform( r_i_ci{i}'));
+    if i == 4
+        [core_row, core_col] = find(shape == 2);
+        [AMs_rows, AMs_cols] = find(shape ~= 0);
+        for j =1:length(AMs_cols)
+            r = [ (core_col - AMs_cols(j)) *-d ; (core_row - AMs_rows(j)) *d ;0];% p_j,core
+            r = -[r(1);0;r(2)];
+            
+            addVisual(body, 'Box', box_size{i},trvec2tform( r'))
+        end
+    else
+        addVisual(body, 'Box', box_size{i},trvec2tform( r_i_ci{i}'));
+    end
     addVisual(body, 'Sphere', 0.03, trvec2tform( r_i_ci{i}'));
-
+    
     % Attach body to robot
     if i == 1
         addBody(robot, body, robot.BaseName);

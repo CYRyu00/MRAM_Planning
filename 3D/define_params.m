@@ -12,9 +12,9 @@ m0 = 0.028;
 mu = 0.005964552;
 r = 0.092*sqrt(2)/4;%0.032
 d = 0.1;
-lg = 0.08; % custom
+kt = 0.5; % Nm/rad at the handle
 
-c_cart = 100e-2; 
-c_pole = 100e-5; 
+c_1 = 0.3; % Nms/rad 
+c_2 = 0.01; 
 
-params = {m0, I0, mu, r, d, thrust_limit, lg,c_cart,c_pole,};
+params = {m0, I0, mu, r, d, thrust_limit, kt ,c_1,c_2};

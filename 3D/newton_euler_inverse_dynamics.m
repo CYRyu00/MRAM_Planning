@@ -1,4 +1,4 @@
-function tau = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q, qd, qdd, F_ext)
+function tau = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q, qd, qdd, F_tip)
     import casadi.*
     
     
@@ -6,7 +6,7 @@ function tau = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q,
     qd = MX(qd);
     qdd = MX(qdd);
     g = MX(g);
-    F_ext = MX(F_ext);
+    F_tip = MX(F_tip);
 
     
     z0 = MX([0; 0; 1]);
@@ -42,8 +42,8 @@ function tau = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q,
     end
 
     % Backward recursion
-    f{n+1} = F_ext(4:6);
-    mu{n+1} = F_ext(1:3);
+    f{n+1} = F_tip(4:6);
+    mu{n+1} = F_tip(1:3);
 
     for i = n:-1:1
         R = R_DH(DH(i+1,:), q(i+1)); 

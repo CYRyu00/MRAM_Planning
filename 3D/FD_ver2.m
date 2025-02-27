@@ -7,7 +7,7 @@ function qdd = FD_ver2(n, DH, mass, inertia, r_i_ci, g, q, qd, tau, F_ext)
     F_ext = MX(F_ext);
     qdd_ = MX.zeros(n,1);
 
-    h = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q, qd, qdd_, F_ext);
+    h = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g, q, qd, qdd_, -F_ext);
 
     M_matrix = MX.zeros(n, n);
     for i = 1:n
@@ -17,7 +17,7 @@ function qdd = FD_ver2(n, DH, mass, inertia, r_i_ci, g, q, qd, tau, F_ext)
         qdd_ = MX.zeros(n,1);
         qdd_(i) = 1;
 
-        M_matrix(i,:) = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g_, q, qd_, qdd_, F_ext_)';
+        M_matrix(i,:) = newton_euler_inverse_dynamics(n, DH, mass, inertia, r_i_ci, g_, q, qd_, qdd_, -F_ext_)';
     end
 
     qdd = M_matrix \ (tau - h);
