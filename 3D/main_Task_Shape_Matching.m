@@ -142,16 +142,73 @@ end
 %% Plot
 close all
 figure 
-subplot(2,1,1)
-plot(all_optimal_value_array,'.-')
-title("object function value")
-subplot(2,1,2)
-plot(all_exit_flag_array,'*')
-title("exit flag")
+hold on
+for i = 1:length(all_exit_flag_array)
+    if all_exit_flag_array(i) == 1
+        plot(i, all_optimal_value_array(i), 'b.') % Red for exit_flag == 1
+    else
+        plot(i, all_optimal_value_array(i), 'r.') % Blue otherwise
+    end
+end
+hold off
 
+Ixx_array = [];
+Iyy_array = [];
+Izz_array = [];
+for i = 1:length( all_optimal_value_array)
+    [tmp, tmp2, Inertia] = get_inertia_ver2(shapes{i} ,m0, I0, d);
+    Ixx_array = [Ixx_array;Inertia(1,1)];
+    Iyy_array = [Iyy_array;Inertia(2,2)];
+    Izz_array = [Izz_array;Inertia(3,3)];
+end
+
+%ascending order
+[sorted_Ixx, sortIdx_xx] = sort(Ixx_array);
+sorted_xx_all_optimal_value_array = all_optimal_value_array(sortIdx_xx);
+[sorted_Iyy, sortIdx_yy] = sort(Iyy_array);
+sorted_yy_all_optimal_value_array = all_optimal_value_array(sortIdx_yy);
+[sorted_Izz, sortIdx_zz] = sort(Izz_array);
+sorted_zz_all_optimal_value_array = all_optimal_value_array(sortIdx_zz);
+%%
+figure 
+subplot(3,1,1)
+hold on
+for i = 1:length(all_exit_flag_array)
+    if all_exit_flag_array(i) == 1
+        plot(sorted_Ixx(i),sorted_xx_all_optimal_value_array(i), 'b.') % Red for exit_flag == 1
+    else
+        plot(sorted_Ixx(i),sorted_xx_all_optimal_value_array(i), 'r.') % Blue otherwise
+    end
+end
+hold off
+title("I_{xx} - Cost func. value")
+
+subplot(3,1,2)
+hold on
+for i = 1:length(all_exit_flag_array)
+    if all_exit_flag_array(i) == 1
+        plot(sorted_Iyy(i), sorted_yy_all_optimal_value_array(i), 'b.') % Red for exit_flag == 1
+    else
+        plot(sorted_Iyy(i), sorted_yy_all_optimal_value_array(i), 'r.') % Blue otherwise
+    end
+end
+hold off
+title("I_{yy} - Cost func. value")
+
+subplot(3,1,3)
+hold on
+for i = 1:length(all_exit_flag_array)
+    if all_exit_flag_array(i) == 1
+        plot(sorted_Izz(i), sorted_zz_all_optimal_value_array(i), 'b.') % Red for exit_flag == 1
+    else
+        plot(sorted_Izz(i), sorted_zz_all_optimal_value_array(i), 'r.') % Blue otherwise
+    end
+end
+hold off
+title("I_{zz} - Cost func. value")
 %% plot
 index = global_max_index;
-index = 369;
+%index = 369;
 disp(shapes{index})
 x_opt = cell2mat(all_x_opt(index));
 u_opt = cell2mat(all_u_opt(index));
