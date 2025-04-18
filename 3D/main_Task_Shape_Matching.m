@@ -11,8 +11,8 @@ dh = [0,0,0.95,0;   % [alpha, a, d, theta]
       pi/2,0,0,0];
 gravity = [0;0;-9.81];
 
-m=6;
-all_shapes = generate_all_shapes(m);
+m=9; K=17;L=9;core =[9,1];
+all_shapes = generate_all_shapes(m,K,L,core);
 
 % Show example rigidbodytree
 shape = all_shapes{6}{10};
@@ -43,73 +43,71 @@ for j=1:N+1
     end
 end
 
-thrust_scale = 1;
+thrust_scale = 3;
 u_max = thrust_limit *thrust_scale;
 u_min = thrust_limit *(-thrust_scale);
-tau_scale = 1;
+tau_scale = 0;
 tau_min = -0.2 *tau_scale ; 
 tau_max =  0.2 *tau_scale ;
 
 %%
-for i=6:1:6
-num_AMs = i;
-shapes = all_shapes{i};
-
-%
-iter = length(shapes);
-all_x_opt = cell(iter, 1);  % Store x_opt for each iteration
-all_u_opt = cell(iter, 1);  % Store u_opt for each iteration
-all_optimal_value = cell(iter, 1);  % Store optimal_value for each iteration
-all_exit_flag = cell(iter, 1);  % Store exit_flag for each iteration
-all_processing_time = cell(iter, 1);  % Store processing_time for each iteration
-
-x_interp = zeros(N+1, 8);
-vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
-vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
-for k = 1:8
-    x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
-end
-for k = 1:(N+1)
-    x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
-end
-
-nu = 2 + num_AMs*4; zero_us = zeros(nu,1); 
-X_init_guess = [reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
-
-%% nlp for each shape
-tic;
-for j =1:1:iter
-    fprintf('Start shape %d / %d\n', j,iter);
-    fprintf('Shape: \n');
-    shape = shapes{j};
-    disp(shape);
+for i=8:1:9
+    num_AMs = i;
+    shapes = all_shapes{i};
     
-    [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
-    mass =  {10, 1, 0.5, AM_mass};
-    inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
-    r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
-
-    %Solve NLP
-    [ x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
-          = solve_nlp(params,shape,num_AMs,dh, gravity,mass,inertia,r_i_ci, ...
-                      qo_desired, tau_min, tau_max,u_min,u_max,x_0,x_f,X_init_guess,dt,N);
-    % Save results for this iteration
-    all_x_opt{j} = x_opt;
-    all_u_opt{j} = u_opt;
-    all_optimal_value{j} = optimal_value;
-    all_exit_flag{j} = exit_flag;
-    all_processing_time{j} = processing_time;
-    fprintf('exit flag: %d\n', exit_flag);
-end
-elapsed_time = toc;  
-fprintf('Total time: %f seconds\n', elapsed_time);
-%% Save the result
-file_name = sprintf("result/%d_%d_%d_optimization_results.mat", num_AMs,thrust_scale,tau_scale);
-elapsed_time = sum(cell2mat(all_processing_time));
-
-save(file_name, 'all_x_opt', 'all_u_opt', 'all_optimal_value', 'all_exit_flag', 'all_processing_time','elapsed_time','shapes'...
-    ,'params','x_0','x_f','u_min','u_max','tau_min', 'tau_max','dt','N','thrust_scale');
-
+    iter = length(shapes);
+    all_x_opt = cell(iter, 1);  % Store x_opt for each iteration
+    all_u_opt = cell(iter, 1);  % Store u_opt for each iteration
+    all_optimal_value = cell(iter, 1);  % Store optimal_value for each iteration
+    all_exit_flag = cell(iter, 1);  % Store exit_flag for each iteration
+    all_processing_time = cell(iter, 1);  % Store processing_time for each iteration
+    
+    x_interp = zeros(N+1, 8);
+    vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
+    vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
+    for k = 1:8
+        x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
+    end
+    for k = 1:(N+1)
+        x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
+    end
+    
+    nu = 2 + num_AMs*4; zero_us = zeros(nu,1); 
+    X_init_guess = [reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
+    
+    %% nlp for each shape
+    tic;
+    for j =1:1:iter
+        fprintf('\nnum AMs: %d\nStart shape %d / %d\n', num_AMs, j,iter);
+        fprintf('Shape: \n');
+        shape = shapes{j};
+        disp(shape);
+        
+        [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
+        mass =  {10, 1, 0.5, AM_mass};
+        inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
+        r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
+    
+        %Solve NLP
+        [ x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
+              = solve_nlp(params,shape,num_AMs,dh, gravity,mass,inertia,r_i_ci, ...
+                          qo_desired, tau_min, tau_max,u_min,u_max,x_0,x_f,X_init_guess,dt,N);
+        % Save results for this iteration
+        all_x_opt{j} = x_opt;
+        all_u_opt{j} = u_opt;
+        all_optimal_value{j} = optimal_value;
+        all_exit_flag{j} = exit_flag;
+        all_processing_time{j} = processing_time;
+        fprintf('exit flag: %d\n', exit_flag);
+        fprintf('optimal_value: %f\n', optimal_value);
+    end
+    elapsed_time = toc;  
+    fprintf('Total time: %f seconds\n', elapsed_time);
+    %% Save the result
+    file_name = sprintf("result/%d_%d_%d", num_AMs,thrust_scale,tau_scale);
+    elapsed_time = sum(cell2mat(all_processing_time));
+    
+    save(file_name);
 end
 %% Find best and worst Shape
 all_optimal_value_array = cell2mat(all_optimal_value);
@@ -207,7 +205,7 @@ end
 hold off
 title("I_{zz} - Cost func. value")
 %% plot
-index = global_max_index;
+index = global_min_index;
 %index = 369;
 disp(shapes{index})
 x_opt = cell2mat(all_x_opt(index));
@@ -267,5 +265,5 @@ force_scale = 0.5;
 do_view = 0 ;
 robot = generate_door_ver2(n,dh,r_i_ci, d, gravity, shape, mass,inertia, do_view,q);
 
-%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape)
-plot_tree(robot, dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape)
+save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape)
+%plot_tree(robot, dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape)

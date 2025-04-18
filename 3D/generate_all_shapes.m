@@ -1,8 +1,8 @@
-function shapes = generate_all_shapes(m)
+function shapes = generate_all_shapes(m,K,L,core)
     shapes = cell(1,m);
     
-    shape = zeros(2*m+1,m);
-    shape(m+1,1) = 2;
+    shape = zeros(K,L);
+    shape(core(1),core(2)) = 2;
     shapes{1} = {shape};
     
     % Get size of shape
