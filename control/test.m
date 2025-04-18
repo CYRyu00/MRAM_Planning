@@ -1,4 +1,6 @@
-load("..\3D_ver2\result_9_5\hovor\max_iter_1000\5_3_0.mat")
+addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "params")
+%%
+load("..\3D_ver2\data\result_9_5\hovor\max_iter_1000\5_3_0.mat")
 shape = zeros([K,L]);
 shape_idx = zeros([K,L]);
 x_d = x_opt;
@@ -14,7 +16,6 @@ fprintf('Shape : \n')
 disp(shape)
 
 %% CASDI function: Get A and B
-addpath("../../casadi-3.6.7-windows64-matlab2018b")
 import casadi.*
 
 delta_inertia = MX.sym('delta_inertia',1,1);

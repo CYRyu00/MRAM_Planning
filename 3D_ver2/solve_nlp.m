@@ -1,3 +1,139 @@
+addpath("dynamics\","params\" ,"plot\")
+%%
+% Define Dynamic parameters and shapes
+n = 4;
+params = define_params();
+m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9};
+mass_door = params{10}; handle_factor = params{11};
+dh = [0,0,0.95,0;   % [alpha, a, d, theta]
+      -pi/2, 0.9 , 0,0;
+      0,-0.1,0.23,pi/2;
+      pi/2,0,0,-pi/2;
+      pi/2,0,0,0];
+gravity = [0;0;-9.81];
+
+% NLP parameters
+dt = 0.1;
+N = 80;
+
+x_0 = [0;0;0;0;0;0;0;0];
+x_f = [pi/4;0;0;0;0;0;0;0];
+qo_desired = zeros(2,N+1);
+T = N*dt; t0 = 1; t1 = 1; %1sec
+for j=1:N+1
+    t = (j-1)*dt;
+    if t < t0 
+        qo_desired(:,j) = [0 ; pi/6*(cos(pi/t0*t) - 1)/2];
+    elseif t < T-t0
+        qo_desired(:,j) = [(x_f(1)-x_0(1))/(T-t0)*(t-t0) ;-pi/6];
+    else
+        qo_desired(:,j) = [(x_f(1)-x_0(1))/(T-t0)*(t-t0) ;pi/6*(cos(pi/t0*t -pi/t0*T) - 1)/2];
+    end
+end
+qo_desired = [repmat(x_0(1:2),1,t1/dt), qo_desired, repmat(x_f(1:2),1,t1/dt)];
+N = N + t1/dt*2;
+
+thrust_scale = 3;
+tau_scale = 0;
+
+u_max = thrust_limit *thrust_scale;
+u_min = thrust_limit *(-thrust_scale);
+tau_min = -0.2 *tau_scale ; 
+tau_max =  0.2 *tau_scale ;
+
+% initial guess
+x_interp = zeros(N+1, 8);
+vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
+vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
+for k = 1:8
+    x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
+end
+for k = 1:(N+1)
+    x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
+end
+
+for MAX_ITER=[2]
+    fprintf("\nmax_iter: %d\n", MAX_ITER);
+        for num_AMs = 5:1:5
+            %num_AMs = 12;
+            K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
+            %K=9; L=5; core=[5,1];
+            nu = 2 + K*L*4; zero_us = zeros(nu,1); 
+            lau_init = ones(K,L)/K/L*(num_AMs-1);
+            lau_init(core(1),core(2))=1; %lau_init(core(1)+1,core(2))=1.0; %lau_init(core(1)+1,core(2)+1)=0.5; 
+            X_init_guess = [reshape(lau_init,K*L,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
+            
+            max_iter = MAX_ITER;%default 50
+            eps = 0.25;
+            gamma = 0.3;
+        
+            %Solve NLP
+            [lau_opt, x_opt, u_opt, optimal_value, exit_flag, processing_time, lau_history, exit_flag_history, time_history] ....
+                      =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N,max_iter,eps,gamma);
+            fprintf("num AMs : %d\n", num_AMs);
+            fprintf("exit flag: %d \n", exit_flag);
+            fprintf("optimal value: %f \n", optimal_value);
+            fprintf("lau: \n"); disp(lau_opt)
+            
+            %filename = sprintf('data/result/hovor/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
+            filename = sprintf('data/result/hovor/max_iter_1000/test.mat', max_iter, num_AMs, thrust_scale , tau_scale);
+            
+            save(filename);
+        end
+end
+%% plot
+close all
+figure('Position',[900,100,900,800])
+time = (1:1:N+1)*dt;
+subplot(4,1,1)
+plot(time, x_opt(:,1:4))
+hold on
+plot(time, qo_desired, "--")
+legend("q_1","q_2","q_3","q_4","q_{1,ref}","q_{2,ref}")
+title("states")
+axis tight;
+
+subplot(4,1,2)
+plot(time(1:end-1),u_opt(:,1:2))
+legend("u_1","u_2")
+title("motor inputs")
+axis tight;
+
+[AM_com, AM_mass, AM_inertia]  = get_inertia_double(lau_opt,K,L, core ,m0, I0, d);
+mass =  {mass_door(1), mass_door(2), mass_door(1), AM_mass};
+inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
+r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
+
+wrench = zeros(N,6);
+tau = zeros(N,n);
+for i=1:N
+    wrench(i,:) = map_u2wrench_double( u_opt(i,3:end)',lau_opt,K,L, core , mu , r , d);
+    q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
+    F_ext = wrench(i,:)';
+    tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); u_opt(i,1); u_opt(i,2)] + ...
+        newton_euler_inverse_dynamics_double(n, dh, mass, inertia, r_i_ci, gravity, q, qd, qdd, F_ext);
+end
+subplot(4,1,3)
+plot(time(1:end-1),wrench)
+legend("m_x","m_y","m_z","f_x","f_y","f_z")
+title("Wrench exp. AM frame")
+axis tight;
+
+subplot(4,1,4)
+plot(time(1:end-1),tau)
+axis tight
+legend("tau1","tau2","tau3","tau4")
+title("generalized force")
+axis tight;
+
+%plot 3d video
+do_view=1; q =  [0;0;0;0]; g=[0;0;-9.81];
+robot = generate_door(n,dh,r_i_ci,d, g, lau_opt, core, mass,inertia, do_view,q);
+
+slow_factor =1; force_scale = 0.2;
+%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
+plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
+
 function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_history ,exit_flag_history, time_history] ....
           =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N ,max_iter,eps,gamma)
     addpath("../../casadi-3.6.7-windows64-matlab2018b")
@@ -44,7 +180,7 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     obj_history = cell(1,100);
     
     tic
-    while   ( success==0 || eps> (0.005*gamma) ) && iter < 15 
+    while   ( success==0 || eps> (0.005*gamma) ) && iter < 2
         fprintf("num AM: %d, iter: %d, eps: %f\n",num_AMs, iter,eps);
         obj = 0;
         g = [];
@@ -160,135 +296,3 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     processing_time = sum(cell2mat(time_history));
     disp(solver.stats.return_status)
 end
-
-%%
-% Define Dynamic parameters and shapes
-n = 4;
-params = define_params();
-m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9};
-mass_door = params{10}; handle_factor = params{11};
-dh = [0,0,0.95,0;   % [alpha, a, d, theta]
-      -pi/2, 0.9 , 0,0;
-      0,-0.1,0.23,pi/2;
-      pi/2,0,0,-pi/2;
-      pi/2,0,0,0];
-gravity = [0;0;-9.81];
-
-% NLP parameters
-dt = 0.1;
-N = 80;
-
-x_0 = [0;0;0;0;0;0;0;0];
-x_f = [pi/4;0;0;0;0;0;0;0];
-qo_desired = zeros(2,N+1);
-T = N*dt; t0 = 1; t1 = 1; %1sec
-for j=1:N+1
-    t = (j-1)*dt;
-    if t < t0 
-        qo_desired(:,j) = [0 ; pi/6*(cos(pi/t0*t) - 1)/2];
-    elseif t < T-t0
-        qo_desired(:,j) = [(x_f(1)-x_0(1))/(T-t0)*(t-t0) ;-pi/6];
-    else
-        qo_desired(:,j) = [(x_f(1)-x_0(1))/(T-t0)*(t-t0) ;pi/6*(cos(pi/t0*t -pi/t0*T) - 1)/2];
-    end
-end
-qo_desired = [repmat(x_0(1:2),1,t1/dt), qo_desired, repmat(x_f(1:2),1,t1/dt)];
-N = N + t1/dt*2;
-
-thrust_scale = 3;
-tau_scale = 0;
-
-u_max = thrust_limit *thrust_scale;
-u_min = thrust_limit *(-thrust_scale);
-tau_min = -0.2 *tau_scale ; 
-tau_max =  0.2 *tau_scale ;
-
-% initial guess
-x_interp = zeros(N+1, 8);
-vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
-vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
-for k = 1:8
-    x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
-end
-for k = 1:(N+1)
-    x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
-end
-for MAX_ITER=[1000]
-    fprintf("\nmax_iter: %d\n", MAX_ITER);
-        for num_AMs = 11:1:15
-            %num_AMs = 12;
-            K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
-            %K=9; L=5; core=[5,1];
-            nu = 2 + K*L*4; zero_us = zeros(nu,1); 
-            lau_init = ones(K,L)/K/L*(num_AMs-1);
-            lau_init(core(1),core(2))=1; %lau_init(core(1)+1,core(2))=1.0; %lau_init(core(1)+1,core(2)+1)=0.5; 
-            X_init_guess = [reshape(lau_init,K*L,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
-            
-            max_iter = MAX_ITER;%default 50
-            eps = 0.25;
-            gamma = 0.3;
-        
-            %Solve NLP
-            [lau_opt, x_opt, u_opt, optimal_value, exit_flag, processing_time, lau_history, exit_flag_history, time_history] ....
-                      =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N,max_iter,eps,gamma);
-            fprintf("num AMs : %d\n", num_AMs);
-            fprintf("exit flag: %d \n", exit_flag);
-            fprintf("optimal value: %f \n", optimal_value);
-            fprintf("lau: \n"); disp(lau_opt)
-            
-            filename = sprintf('result/hovor/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
-            save(filename);
-        end
-end
-%% plot
-close all
-figure('Position',[900,100,900,800])
-time = (1:1:N+1)*dt;
-subplot(4,1,1)
-plot(time, x_opt(:,1:4))
-hold on
-plot(time, qo_desired, "--")
-legend("q_1","q_2","q_3","q_4","q_{1,ref}","q_{2,ref}")
-title("states")
-axis tight;
-
-subplot(4,1,2)
-plot(time(1:end-1),u_opt(:,1:2))
-legend("u_1","u_2")
-title("motor inputs")
-axis tight;
-
-[AM_com, AM_mass, AM_inertia]  = get_inertia_double(lau_opt,K,L, core ,m0, I0, d);
-mass =  {mass_door(1), mass_door(2), mass_door(1), AM_mass};
-inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
-r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
-
-wrench = zeros(N,6);
-tau = zeros(N,n);
-for i=1:N
-    wrench(i,:) = map_u2wrench_double( u_opt(i,3:end)',lau_opt,K,L, core , mu , r , d);
-    q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
-    F_ext = wrench(i,:)';
-    tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); u_opt(i,1); u_opt(i,2)] + ...
-        newton_euler_inverse_dynamics_double(n, dh, mass, inertia, r_i_ci, gravity, q, qd, qdd, F_ext);
-end
-subplot(4,1,3)
-plot(time(1:end-1),wrench)
-legend("m_x","m_y","m_z","f_x","f_y","f_z")
-title("Wrench exp. AM frame")
-axis tight;
-
-subplot(4,1,4)
-plot(time(1:end-1),tau)
-axis tight
-legend("tau1","tau2","tau3","tau4")
-title("generalized force")
-axis tight;
-
-%plot 3d video
-do_view=1; q =  [0;0;0;0]; g=[0;0;-9.81];
-robot = generate_door(n,dh,r_i_ci,d, g, lau_opt, core, mass,inertia, do_view,q);
-
-slow_factor =1; force_scale = 0.2;
-%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
-plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)

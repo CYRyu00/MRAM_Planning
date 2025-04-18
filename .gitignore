@@ -1,12 +1,7 @@
 3D/result/
 3D/old_result/
-3D_ver2/result/
-3D_ver2/result_9_5/
-3D_ver2/result_11_6/
-3D_ver2/old_result/
-3D_ver2/old_result_9_5/
-3D_ver2/ineq_result_9_5/
-3D_ver2/ineq_result/
 3D/images/
+
+3D_ver2/data/
 3D_ver2/images/
 *.mat
