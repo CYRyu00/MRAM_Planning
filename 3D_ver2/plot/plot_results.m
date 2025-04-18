@@ -30,8 +30,8 @@ xlabel("Number of Modules");
 legend("f*", "time[min]")
 %% old version
 close all
-for num_AMs = 2:1:7
-    filename = sprintf('old_result/%d_3_0.mat', num_AMs);
+for num_AMs = 3:1:8
+    filename = sprintf('data/old_result/%d_3_0.mat', num_AMs);
     load(filename);
     [optimal_value, argmin]  = min(cell2mat(all_optimal_value));
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, elapsed_time)
@@ -61,7 +61,7 @@ time_arr =[];
 figure('Position',[300 500 500 400])
 
 for num_AMs = 3:1:8
-    filename = sprintf('old_result/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/old_result/%d_3_0.mat', num_AMs);
     load(filename);
     optimal_value = min(cell2mat(all_optimal_value));
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, elapsed_time)
@@ -71,14 +71,28 @@ for num_AMs = 3:1:8
     time_arr = [time_arr; elapsed_time];
 end
 hold on
-plot(num_AMs_arr, opt_val_arr,'o-');
+%plot(num_AMs_arr, opt_val_arr,'o-');
 
 num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
 
 for num_AMs = 5:1:12
-    filename = sprintf('result/max_iter_400/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/result/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+    load(filename);
+    fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
+    
+    num_AMs_arr = [num_AMs_arr ; num_AMs];
+    opt_val_arr = [opt_val_arr; optimal_value];
+    time_arr = [time_arr; processing_time];
+end
+plot(num_AMs_arr, opt_val_arr,'o-');
+
+num_AMs_arr=[];
+opt_val_arr=[];
+time_arr =[];
+for num_AMs = 1:1:12
+    filename = sprintf('data/result_9_5/hover/max_iter_1000/%d_3_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -92,21 +106,7 @@ num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
 for num_AMs = 5:1:12
-    filename = sprintf('result_9_5/max_iter_400/%d_3_0.mat', num_AMs);
-    load(filename);
-    fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
-    
-    num_AMs_arr = [num_AMs_arr ; num_AMs];
-    opt_val_arr = [opt_val_arr; optimal_value];
-    time_arr = [time_arr; processing_time];
-end
-plot(num_AMs_arr, opt_val_arr,'o-');
-
-num_AMs_arr=[];
-opt_val_arr=[];
-time_arr =[];
-for num_AMs = 5:1:12
-    filename = sprintf('result_11_6/max_iter_400/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/result_11_6/hover/max_iter_1000/%d_3_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
         
@@ -120,7 +120,7 @@ grid on
 hold off
 xlabel("Number of Modules")
 title("Object Function value : f*")
-legend("Prev. Full","New Full","New (9,5)","New (11,6)" )
+legend("New Full","New (9,5)","New (11,6)",'FontSize', 12 )
 
 % time
 num_AMs_arr=[];
@@ -129,7 +129,7 @@ time_arr =[];
 figure('Position',[800 500 500 400])
 
 for num_AMs = 3:1:8
-    filename = sprintf('old_result/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/old_result/%d_3_0.mat', num_AMs);
     load(filename);
     optimal_value = min(cell2mat(all_optimal_value));
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, elapsed_time)
@@ -139,13 +139,13 @@ for num_AMs = 3:1:8
     time_arr = [time_arr; elapsed_time];
 end
 hold on
-plot(num_AMs_arr, time_arr/60,'o-');
+%plot(num_AMs_arr, time_arr/60,'o-');
 
 num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
 for num_AMs = 5:1:12
-    filename = sprintf('result/max_iter_400/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/result/hover/max_iter_1000/%d_3_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -158,8 +158,8 @@ plot(num_AMs_arr,time_arr/60,'o-');
 num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
-for num_AMs = 5:1:12
-    filename = sprintf('result_9_5/max_iter_400/%d_3_0.mat', num_AMs);
+for num_AMs = 1:1:12
+    filename = sprintf('data/result_9_5/hover/max_iter_1000/%d_3_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -173,7 +173,7 @@ num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
 for num_AMs = 5:1:12
-    filename = sprintf('result_11_6/max_iter_400/%d_3_0.mat', num_AMs);
+    filename = sprintf('data/result_11_6/hover/max_iter_1000/%d_3_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -188,4 +188,4 @@ hold off
 xlabel("Number of Modules")
 ylabel("time [min]")
 title("Processing Time")
-legend("Prev. Full","New Full","New (9,5)","New (11,6)" )
+legend("New Full","New (9,5)","New (11,6)" ,'FontSize', 12)

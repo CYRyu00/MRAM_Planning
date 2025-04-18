@@ -43,21 +43,21 @@ tau_max =  0.2 *tau_scale ;
 
 % initial guess
 x_interp = zeros(N+1, 8);
-vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
-vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
+vel_x1 = (x_f(1) - x_0(1))/( (N-2*t1)*dt); vel_x2 = (x_f(2) - x_0(2))/( (N-2*t1)*dt);
+vel_x3 = (x_f(3) - x_0(3))/( (N-2*t1)*dt); vel_x4 = (x_f(4) - x_0(4))/( (N-2*t1)*dt);
 for k = 1:8
-    x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
+    x_interp(t1/dt:(end-1-t1/dt), k) = linspace(x_0(k), x_f(k), N+1-2*t1/dt)';
 end
-for k = 1:(N+1)
+for k = t1/dt:(N-t1/dt)
     x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
 end
 
-for MAX_ITER=[2]
+for MAX_ITER=[1000]
     fprintf("\nmax_iter: %d\n", MAX_ITER);
-        for num_AMs = 5:1:5
+        for num_AMs = 4:-1:1
             %num_AMs = 12;
-            K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
-            %K=9; L=5; core=[5,1];
+            %K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
+            K=9; L=5; core=[5,1];
             nu = 2 + K*L*4; zero_us = zeros(nu,1); 
             lau_init = ones(K,L)/K/L*(num_AMs-1);
             lau_init(core(1),core(2))=1; %lau_init(core(1)+1,core(2))=1.0; %lau_init(core(1)+1,core(2)+1)=0.5; 
@@ -75,8 +75,7 @@ for MAX_ITER=[2]
             fprintf("optimal value: %f \n", optimal_value);
             fprintf("lau: \n"); disp(lau_opt)
             
-            %filename = sprintf('data/result/hovor/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
-            filename = sprintf('data/result/hovor/max_iter_1000/test.mat', max_iter, num_AMs, thrust_scale , tau_scale);
+            filename = sprintf('data/result_9_5/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
             
             save(filename);
         end
@@ -134,6 +133,9 @@ slow_factor =1; force_scale = 0.2;
 %save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
 plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
 
+
+
+%%
 function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_history ,exit_flag_history, time_history] ....
           =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N ,max_iter,eps,gamma)
     addpath("../../casadi-3.6.7-windows64-matlab2018b")
@@ -180,7 +182,7 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     obj_history = cell(1,100);
     
     tic
-    while   ( success==0 || eps> (0.005*gamma) ) && iter < 2
+    while   ( success==0 || eps> (0.005*gamma) ) && iter < 15
         fprintf("num AM: %d, iter: %d, eps: %f\n",num_AMs, iter,eps);
         obj = 0;
         g = [];

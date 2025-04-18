@@ -1,6 +1,6 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "params")
 %%
-load("..\3D_ver2\data\result_9_5\hovor\max_iter_1000\5_3_0.mat")
+load("..\3D_ver2\data\result_9_5\hover\max_iter_1000\5_3_0.mat")
 shape = zeros([K,L]);
 shape_idx = zeros([K,L]);
 x_d = x_opt;
@@ -140,7 +140,7 @@ x_sim(1,:)=x_d_interp(1,:);
 disturb_sim = zeros(N_sim, n);
 delta_inertia = 1.0;
 delta_k = 1.0;
-sigma = 0.01;
+sigma = 0.10;
 mean = 0.0;
 max_val = 0.05;
 disturb = mean*ones(n,1);
@@ -160,7 +160,8 @@ for i = 1:N_sim
 end
 
 % Plot
-figure('Position',[100 100 1000 800])
+%figure('Position',[100 100 1000 800])
+figure('Position',[100 100 800 600])
 colors = lines(nx);
 legend_entries = cell(1, nx/2);
 subplot(3,1,1)
@@ -174,11 +175,11 @@ for i = 1:nx/2
     plot(t_sim, x_d_interp(:,i), '--', 'Color', colors(i,:), 'LineWidth', 1.0);
     legend_entries{2*i} = sprintf('$q_{%d,d}$', i);
 end
-legend(legend_entries, 'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 14)
+legend(legend_entries, 'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 10)
 xlabel('Time [s]'); ylabel('State Value')
-title_name = sprintf(['x_{sim} vs x_{desired}, Mass X %.2f, Spring x %.2f, Disturbance ' ...
-                        'Sigma: %.2f, Mean: %.2f'],delta_inertia, delta_k , sigma, mean);
-title(title_name)
+title_name = sprintf(['x_{sim} vs x_{desired}, \nMass X %.2f, Spring x %.2f,\n Disturbance : ' ...
+                        'Sigma: %.2f, Mean: %.2f, Max val :%.2f'],delta_inertia, delta_k , sigma, mean ,max_val);
+title(title_name , 'FontSize',10)
 grid on
 
 subplot(3,1,2)
@@ -193,7 +194,7 @@ for i = (nx/2+1):nx
     plot(t_sim, x_d_interp(:,i), '--', 'Color', colors(i,:), 'LineWidth', 1.0);
     legend_entries{2*i -nx} = sprintf('$\\dot{q}_{%d,d}$', i);
 end
-legend(legend_entries, 'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 14)
+legend(legend_entries, 'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 10)
 xlabel('Time [s]'); ylabel('State Value')
 grid on
 
@@ -226,12 +227,13 @@ for i=1:N_sim
         newton_euler_inverse_dynamics_double(n, dh, mass_double, inertia_double, r_i_ci_double, gravity, q, qd, qdd, F_ext) ...
             + disturb_sim(i,:)';
 end
-figure('Position',[1100 100 700 600])
+%figure('Position',[1100 100 700 600])
+figure('Position',[1100 100 800 600])
 subplot(2,1,1)
 plot(t_sim(1:end-1),wrench)
 
 legend({'$m_x$', '$m_y$', '$m_z$', '$f_x$', '$f_y$', '$f_z$'}, ...
-       'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 12);
+       'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 10);
 title("Wrench exp. AM frame")
 axis tight;
 grid on
@@ -245,7 +247,7 @@ for i = 1:n
 end
 axis tight
 legend({'$\tau_1$','$d_1$', '$\tau_2$','$d_2$', '$\tau_3$', '$d_3$','$\tau_4$','$d_4$',}, ...
-       'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 12);
+       'Interpreter', 'latex', 'FontWeight', 'bold', 'FontSize', 10);
 
 title("generalized force")
 axis tight;
