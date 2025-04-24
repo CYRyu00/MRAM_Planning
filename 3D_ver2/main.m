@@ -1,10 +1,9 @@
-addpath("dynamics\","params\" ,"plot\")
+addpath("dynamics","../params" ,"plot")
 clear
 % Define Dynamic parameters and shapes
 n = 4;
 params = define_params();
-m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9};
-mass_door = params{10}; handle_factor = params{11};
+m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9}; mass_door = params{10}; handle_factor = params{11};
 dh = [0,0,0.95,0;   % [alpha, a, d, theta]
       -pi/2, 0.9 , 0,0;
       0,-0.1,0.23,pi/2;
@@ -58,7 +57,7 @@ max_iter = 2000;
 eps = 0.25;
 gamma = 0.3;
 
-fprintf("\nmax_iter: %d\n", MAX_ITER);
+fprintf("\nmax_iter: %d\n", max_iter);
     for num_AMs = 3:1:3
         if CASE == 1
             K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];

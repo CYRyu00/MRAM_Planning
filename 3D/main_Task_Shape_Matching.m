@@ -1,4 +1,4 @@
-addpath("data\","dynamics\", "plot\", "params\")
+addpath("data","dynamics", "plot", "../params")
 %Define Dynamic parameters and shapes
 n = 4;
 % dynamic parameters of each module 
@@ -55,7 +55,7 @@ tau_min = -0.2 *tau_scale ;
 tau_max =  0.2 *tau_scale ;
 
 %%
-for i= 6:1: min(9,m)
+for i= 3:1:min(9,m)
     num_AMs = i;
     shapes = all_shapes{i};
     
