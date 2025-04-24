@@ -3,7 +3,7 @@ n = 4;
 % dynamic parameters of each module 
 params = define_params();
 m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9};
-
+mass_door = params{10}; handle_factor = params{11};
 dh = [0,0,0.95,0;   % [alpha, a, d, theta]
       -pi/2, 0.9 , 0,0;
       0,-0.1,0.23,pi/2;
@@ -11,13 +11,14 @@ dh = [0,0,0.95,0;   % [alpha, a, d, theta]
       pi/2,0,0,0];
 gravity = [0;0;-9.81];
 
-m=9; K=17;L=9;core =[9,1];
+m = 9; 
+%K = 17; L = 9; core = [9,1];
+K = 2*m - 1 ; L = m; core = [m,1];
 all_shapes = generate_all_shapes(m,K,L,core);
 
-% Show example rigidbodytree
 shape = all_shapes{6}{10};
 [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
-mass =  {10, 1, 0.5, AM_mass};
+mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia = {eye(3)*1, eye(3)*0.01, eye(3)*0.01, AM_inertia, zeros(3,3)};
 r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
 
@@ -26,12 +27,12 @@ robot = generate_door_ver2(n,dh,r_i_ci, d, gravity, shape, mass,inertia, do_view
 
 % NLP parameters
 dt = 0.1;
-N = 100;
+N = 80;
 
 x_0 = [0;0;0;0;0;0;0;0];
 x_f = [pi/4;0;0;0;0;0;0;0];
 qo_desired = zeros(2,N+1);
-T = N*dt; t0 = 1; %1sec
+T = N*dt; t0 = 1; t1 = 1; %1sec
 for j=1:N+1
     t = (j-1)*dt;
     if t < t0 
@@ -42,6 +43,8 @@ for j=1:N+1
         qo_desired(:,j) = [(x_f(1)-x_0(1))/(T-t0)*(t-t0) ;pi/6*(cos(pi/t0*t -pi/t0*T) - 1)/2];
     end
 end
+qo_desired = [repmat(x_0(1:2),1,t1/dt), qo_desired, repmat(x_f(1:2),1,t1/dt)];
+N = N + t1/dt*2;
 
 thrust_scale = 3;
 u_max = thrust_limit *thrust_scale;
@@ -51,7 +54,7 @@ tau_min = -0.2 *tau_scale ;
 tau_max =  0.2 *tau_scale ;
 
 %%
-for i=8:1:9
+for i= 6:1: min(9,m)
     num_AMs = i;
     shapes = all_shapes{i};
     
@@ -63,12 +66,12 @@ for i=8:1:9
     all_processing_time = cell(iter, 1);  % Store processing_time for each iteration
     
     x_interp = zeros(N+1, 8);
-    vel_x1 = (x_f(1) - x_0(1))/(N*dt); vel_x2 = (x_f(2) - x_0(2))/(N*dt);
-    vel_x3 = (x_f(3) - x_0(3))/(N*dt); vel_x4 = (x_f(4) - x_0(4))/(N*dt);
+    vel_x1 = (x_f(1) - x_0(1))/( (N-2*t1)*dt); vel_x2 = (x_f(2) - x_0(2))/( (N-2*t1)*dt);
+    vel_x3 = (x_f(3) - x_0(3))/( (N-2*t1)*dt); vel_x4 = (x_f(4) - x_0(4))/( (N-2*t1)*dt);
     for k = 1:8
-        x_interp(:, k) = linspace(x_0(k), x_f(k), N+1)';
+        x_interp(t1/dt:(end-1-t1/dt), k) = linspace(x_0(k), x_f(k), N+1-2*t1/dt)';
     end
-    for k = 1:(N+1)
+    for k = t1/dt:(N-t1/dt)
         x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
     end
     
@@ -84,7 +87,7 @@ for i=8:1:9
         disp(shape);
         
         [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
-        mass =  {10, 1, 0.5, AM_mass};
+        mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
         inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
         r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
     
@@ -104,7 +107,7 @@ for i=8:1:9
     elapsed_time = toc;  
     fprintf('Total time: %f seconds\n', elapsed_time);
     %% Save the result
-    file_name = sprintf("result/%d_%d_%d", num_AMs,thrust_scale,tau_scale);
+    file_name = sprintf("result/hover/%d_%d_%d", num_AMs,thrust_scale,tau_scale);
     elapsed_time = sum(cell2mat(all_processing_time));
     
     save(file_name);
@@ -137,7 +140,7 @@ if ~isempty(valid_indices)
 else
     fprintf('No valid exit_flag == 1 found.\n');
 end
-%% Plot
+% Plot
 close all
 figure 
 hold on
@@ -167,7 +170,7 @@ sorted_xx_all_optimal_value_array = all_optimal_value_array(sortIdx_xx);
 sorted_yy_all_optimal_value_array = all_optimal_value_array(sortIdx_yy);
 [sorted_Izz, sortIdx_zz] = sort(Izz_array);
 sorted_zz_all_optimal_value_array = all_optimal_value_array(sortIdx_zz);
-%%
+%
 figure 
 subplot(3,1,1)
 hold on
@@ -204,7 +207,7 @@ for i = 1:length(all_exit_flag_array)
 end
 hold off
 title("I_{zz} - Cost func. value")
-%% plot
+% plot
 index = global_min_index;
 %index = 369;
 disp(shapes{index})
@@ -213,7 +216,7 @@ u_opt = cell2mat(all_u_opt(index));
 shape = cell2mat(shapes(index));
 
 [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
-mass =  {10, 1, 0.5, AM_mass};
+mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
 r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
 
@@ -240,7 +243,7 @@ for i=1:N
     q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
     F_ext = wrench(i,:)';
     
-    tau(i,:) =  [0; -kt*q(2) + mass{2}*0.80*9.81*0.040; u_opt(i,1); u_opt(i,2)] + ...
+    tau(i,:) =  [0; -kt*q(2) + mass{2}*handle_factor; u_opt(i,1); u_opt(i,2)] + ...
         newton_euler_inverse_dynamics_double(n, dh, mass, inertia, r_i_ci, gravity, q, qd, qdd, F_ext);
 end
 subplot(4,1,3)

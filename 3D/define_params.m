@@ -12,9 +12,12 @@ m0 = 0.028;
 mu = 0.005964552;
 r = 0.092*sqrt(2)/4;%0.032
 d = 0.1;
-kt = 0.5; % Nm/rad at the handle
+kt = 0.1; % Nm/rad at the handle
 
 c_1 = 0.3; % Nms/rad 
 c_2 = 0.01; 
 
-params = {m0, I0, mu, r, d, thrust_limit, kt ,c_1,c_2};
+mass_door = [10,1,0.05];
+handle_factor = 0.95*9.81*0.0475;
+
+params = {m0, I0, mu, r, d, thrust_limit, kt ,c_1,c_2, mass_door ,handle_factor };

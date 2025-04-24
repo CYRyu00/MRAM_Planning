@@ -4,8 +4,8 @@ addpath("../../casadi-3.6.7-windows64-matlab2018b")
 import casadi.*
 
 n=4;
-m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; kt= params{7};c_1=params{8};c_2=params{9};
-
+m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};kt=params{7};c_1=params{8};c_2=params{9};
+mass_door = params{10}; handle_factor = params{11};
 % 
 nx = n*2;
 nu = 2 + num_AMs*4;
@@ -14,7 +14,7 @@ x = MX.sym('x', nx, 1); % [q; qd];
 u = MX.sym('u', nu, 1);
 %% Dynamics
 %F_ext = [0;0;0;0;0;0]; tau = [0;0;0;0];
-tau = [-c_1*x(5);(-c_2*x(6) -kt*x(2) +mass{2}*0.80*9.81*0.040 ); u(1); u(2)] ;
+tau = [-c_1*x(5);(-c_2*x(6) -kt*x(2) +mass{2}*handle_factor); u(1); u(2)] ;
 F_ext = map_u2wrench( u(3:end), shape , mu , r , d);
 
 qdd = FD_ver2(n, dh, mass, inertia, r_i_ci, gravity, x(1:4), x(5:8), tau, F_ext);
@@ -30,20 +30,24 @@ opt_variables = [reshape(X, nx*(N+1), 1); reshape(U, nu*N, 1)];
 %%
 obj = 0;
 g = [];
-Q1 = diag([0,0,0,0,1,1,1,1])*0.1; Q2 =diag([1,1]);
+Q1 = diag([0,0,0,0,1,1,1,1])*0.1; Q2 =diag([1,1]); Q3 = diag([1,1,1,1,1,1,1,1])*1e1;
 R = diag(ones(nu,1))*1;
 
 
 for k = 1:N
-  % obj = obj + (X(:,k)-x_f)'*Q*(X(:,k)-x_f);
-  obj = obj + X(:,k)'*Q1*X(:,k) + (X(1:2,k) - qo_desired(:,k))'*Q2*(X(1:2,k) - qo_desired(:,k));
-  obj = obj + U(:,k)'*R*U(:,k);
-
-  % dynamics equality constraint
-  g = [g; X(:,k+1) - f(X(:,k), U(:,k))]; 
-  
+    if k <= 1/dt
+        %g = [g; X(:,k) - x_0 ; -X(:,k) + x_0]; 
+        obj = obj + (X(:,k) - x_0)'*Q3*(X(:,k) - x_0);
+    elseif N-k <= 1/dt
+        %g = [g; X(:,k) - x_f ; -X(:,k) + x_f];
+        obj = obj + (X(:,k) - x_f)'*Q3*(X(:,k) - x_f);
+    else
+        obj = obj + X(:,k)'*Q1*X(:,k) + (X(1:2,k) - qo_desired(:,k))'*Q2*(X(1:2,k) - qo_desired(:,k));
+        obj = obj + U(:,k)'*R*U(:,k);
+    end
+    % dynamics equality constraint
+    g = [g; X(:,k+1) - f(X(:,k), U(:,k))]; 
 end
-%g = [g; X(:,N+1) - x_f; - X(:,N+1) + x_f];
 g = [g; X(:,1) - x_0];
 g = [g; X(:,N+1) - x_f];
 
@@ -51,8 +55,8 @@ g = [g; X(:,N+1) - x_f];
 nlp_prob = struct('x', opt_variables, 'f', obj, 'g', g);
 nlp_opts = struct;
 nlp_opts.ipopt.print_level = 1;
-nlp_opts.ipopt.tol = 1e-6;
-nlp_opts.ipopt.max_iter = 300;
+nlp_opts.ipopt.tol = 1e-3;
+nlp_opts.ipopt.max_iter = 2000;
 nlp_opts.ipopt.mu_strategy = 'adaptive';
 nlp_opts.ipopt.linear_solver = 'mumps';
 %nlp_opts.ipopt.jacobian_approximation = 'exact'; 
