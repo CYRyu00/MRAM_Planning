@@ -1,6 +1,5 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "params")
-%%
-load("..\3D_ver2\data\result_9_5\hover\max_iter_1000\5_3_0.mat")
+load("../3D_ver2/data/result_9_5/hover/new_ref_2/8_1_0.mat")
 shape = zeros([K,L]);
 shape_idx = zeros([K,L]);
 x_d = x_opt;
@@ -48,15 +47,6 @@ x_dot_func = Function('x_dot_func', {x ,u ,delta_inertia, delta_k, disturb }, {x
 A_func = Function('A_func', {x, u, delta_inertia ,delta_k,disturb }, {A});
 B_func = Function('B_func', {x, u, delta_inertia, delta_k,disturb }, {B});
 %%
-%hover 1sec at first and last
-%params = define_params();
-%m0 = params{1}; I0 = params{2}; mass_door = params{10};
-%[AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
-%N = N + 1/dt*2;
-%x_d = [repmat(x_0', 1/dt,1); x_d ; repmat(x_f', 1/dt,1)];
-%u_hovor = ones(1,nu)*(AM_mass + mass_door(3))*norm(gravity)/num_AMs/4; 
-%u_d = [repmat(u_hovor,1/dt,1 ); u_d ; repmat(u_hovor,1/dt,1 )];
-
 dt_sim = 0.01;
 N_sim = N*dt/dt_sim;
 
@@ -78,10 +68,10 @@ title("dt = 0.01")
 
 figure('Position',[700 500 600 400])
 subplot(2,1,1)
-plot(t(1:end-1), u_d(:,1:8),'.');
+plot(t(1:end-1), u_d,'.');
 title("u_d, dt = 0.1")
 subplot(2,1,2)
-plot(t_sim(1:end-1), u_d_interp(:,1:8),'.','MarkerSize',2);
+plot(t_sim(1:end-1), u_d_interp,'.','MarkerSize',2);
 title("dt = 0.01")
 
 %%
@@ -108,6 +98,84 @@ else
     fprintf('❌ System is NOT controllable. at time step : %d\n\n',i)
 end
 %%
+N_horizon = 10;  % Set reachability window
+min_eigval_arr = [];
+max_eigval_arr = [];
+xT_W_r_x_arr = [];
+
+for i = 1:N_sim - N_horizon + 1
+    W_r = zeros(2*n);
+    Phi = eye(2*n);
+
+    for j = 0:N_horizon-1
+        A_j = A_arr{i + j};
+        B_j = B_arr{i + j};
+
+        if j > 0
+            Phi = A_arr{i + j - 1} * Phi;
+        end
+
+        W_r = W_r + Phi * B_j * B_j' * Phi';
+    end
+
+    % Compute eigenvalues and eigenvectors
+    [V, D] = eig(W_r);  % D: diagonal matrix of eigenvalues, V: eigenvectors
+
+    fprintf('Step %d : \n', i);
+    %fprintf('Eigenvalues of W_r:\n');
+    %disp(diag(D)');
+
+    % Optionally display dominant eigenvector (corresponding to largest eigenvalue)
+    [max_eigval, max_idx] = max(diag(D));
+    fprintf('Largest eigenvalue: %g\n', max_eigval);
+    fprintf('Corresponding eigenvector:\n');
+    disp(V(:, max_idx)');
+    
+    [min_eigval, min_idx] = min(diag(D)); 
+    min_eigval_arr = [min_eigval_arr ;min_eigval];
+    max_eigval_arr = [max_eigval_arr ;max_eigval];
+    
+    xT_W_r_x = zeros(1,2*n);
+    for k = 1:2*n
+        e_k = zeros(2*n,1); e_k(k) = 1;
+        xT_W_r_x(k) = e_k'*W_r*e_k;
+    end
+    xT_W_r_x_arr = [xT_W_r_x_arr; xT_W_r_x];
+
+    fprintf('Smallest eigenvalue: %g\n', min_eigval);
+    fprintf('Corresponding eigenvector:\n');
+    disp(V(:, min_idx)');
+    
+    fprintf('-----------------------------------\n');
+end
+
+t_tmp = (1:N_sim - N_horizon + 1)*dt_sim;
+figure
+hold on
+plot( t_tmp, log(max_eigval_arr)/log(10))
+plot( t_tmp, log(min_eigval_arr)/log(10))
+legend("max eigen value", "min eigen value",'FontSize', 14,'Interpreter', 'latex')
+xlabel('time[sec]' , 'FontSize', 14, 'Interpreter', 'latex')
+ylabel( '$\log_{10}{(\lambda)}$','FontSize', 14,'Interpreter', 'latex')
+title({'Eigenvalues of $W_r$ (log scale)'}, ...
+       'Interpreter','latex','FontSize',14);
+grid on
+
+figure
+hold on
+colors = lines(n);
+for k=1:n
+    plot( t_tmp', log(xT_W_r_x_arr(:,k)),'Color', colors(k,:))
+    plot( t_tmp', log(xT_W_r_x_arr(:,k+n)),'Color', colors(k,:) , 'LineStyle','--')
+end 
+legend({'$q_1$', '$\dot{q_1}$','$q_2$','$\dot{q_2}$','$q_3$','$\dot{q_3}$','$q_4$','$\dot{q_4}$'}, ...
+       'Interpreter','latex','FontSize',14);
+xlabel('time[sec]', 'FontSize', 14, 'Interpreter', 'latex')
+ylabel( '$\log_{10}{(e_i^T W_r e_i)}$','FontSize', 14,'Interpreter', 'latex')
+title({'$x^T W_r x$'}, ...
+       'Interpreter','latex','FontSize',14);
+grid on
+%%
 K_arr = cell(1, N_sim);
 Q = diag(ones(nx,1));
 Qf = diag(ones(nx,1));
@@ -133,25 +201,25 @@ for i = N_sim:-1:1
     P = Q + A' * P * A - A' * P * B * (S \ (B' * P * A));
 end
 %% Simulation 
-%TODO
 x_sim = zeros(N_sim+1,nx);
 u_sim = zeros(N_sim,nu);
 x_sim(1,:)=x_d_interp(1,:);
 disturb_sim = zeros(N_sim, n);
 delta_inertia = 1.0;
 delta_k = 1.0;
-sigma = 0.10;
-mean = 0.0;
-max_val = 0.05;
+sigma = 0.0 ;
+mean = 0.1;
+max_val = 0.1;
 disturb = mean*ones(n,1);
 
 rng('shuffle') 
 for i = 1:N_sim
     %if mod(i,10) == 1
-        disturb_dot = randn(n, 1) *sigma*3;
+        disturb_dot = randn(n, 1) *sigma;
         disturb = disturb + disturb_dot *dt_sim;
         
-        disturb = min(max(disturb, -max_val), max_val) ;
+        disturb = min(max(disturb, -max_val), max_val);
+        %disturb(1)= 0;
     %end
     
     disturb_sim(i,:) = disturb;
