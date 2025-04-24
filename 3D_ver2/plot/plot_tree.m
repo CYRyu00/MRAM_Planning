@@ -1,4 +1,4 @@
-function plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau, core, K, L)
+function plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho, core, K, L)
 x=x_opt;
 u=u_opt;
 
@@ -42,7 +42,7 @@ for i = 1:N
         p_05 = T_05(1:3, 4);
         R_05 = T_05(1:3, 1:3);
         
-        wrench =  map_u2wrench_double(u(i,3:end)', lau,K,L, core , mu , r , d);
+        wrench =  map_u2wrench_double(u(i,3:end)', rho,K,L, core , mu , r , d);
 
         % Force
         f_w = R_05 *wrench(4:6);   

@@ -1,10 +1,10 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "params")
-load("../3D_ver2/data/result_9_5/hover/new_ref_2/8_1_0.mat")
+load("../3D_ver2/data/test.mat")
 shape = zeros([K,L]);
 shape_idx = zeros([K,L]);
 x_d = x_opt;
 u_d = zeros([N,4*num_AMs]);
-[AMs_rows, AMs_cols] = find(lau_opt >= 0.9);
+[AMs_rows, AMs_cols] = find(rho_opt >= 0.9);
 for i = 1:length(AMs_rows)
     shape(AMs_rows(i),AMs_cols(i)) = 1;
     shape_idx(AMs_rows(i),AMs_cols(i)) = i;
@@ -209,7 +209,7 @@ delta_inertia = 1.0;
 delta_k = 1.0;
 sigma = 0.0 ;
 mean = 0.1;
-max_val = 0.1;
+max_val = 0.0;
 disturb = mean*ones(n,1);
 
 rng('shuffle') 

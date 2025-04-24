@@ -1,6 +1,6 @@
 %% NLP SOLVER
-function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_history ,exit_flag_history, time_history] ....
-          =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N ,max_iter,eps,gamma)
+function [rho_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, rho_history ,exit_flag_history, time_history] ....
+          =  solve_nlp(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N ,max_iter,eps,gamma)
     addpath("../../casadi-3.6.7-windows64-matlab2018b")
     import casadi.*
     
@@ -13,16 +13,16 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     
     x = MX.sym('x', nx, 1); % [q; qd];
     u = MX.sym('u', nu, 1);
-    lau = MX.sym('lau', K,L); %shape
+    rho = MX.sym('rho', K,L); %shape
     
     % Dynamics
-    [AM_com, AM_mass, AM_inertia] = get_inertia(lau,K,L, core ,m0, I0, d);
+    [AM_com, AM_mass, AM_inertia] = get_inertia(rho,K,L, core ,m0, I0, d);
     mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
     inertia = {eye(3)*1, eye(3)*0.01, eye(3)*0.01, AM_inertia, zeros(3,3)};
     r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
     
     tau = [-c_1*x(5);(-c_2*x(6) -kt*x(2) + mass{2} *handle_factor ); u(1); u(2)] ;
-    F_ext = map_u2wrench( u(3:end), lau,K,L, core , mu , r , d);
+    F_ext = map_u2wrench( u(3:end), rho,K,L, core , mu , r , d);
     
     qdd = FD(n, dh, mass, inertia, r_i_ci, gravity, x(1:4), x(5:8), tau, F_ext);
     
@@ -30,16 +30,16 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     x_next = x + dt*x_dot ; 
     
     % Create CasADi function for the dynamics
-    f = Function('f', {x, u, lau}, {x_next});
+    f = Function('f', {x, u, rho}, {x_next});
     
     U = MX.sym('U', nu, N);
     X = MX.sym('X', nx, N+1);
-    opt_variables = [reshape(lau, K*L,1);reshape(X, nx*(N+1), 1); reshape(U, nu*N, 1)];
+    opt_variables = [reshape(rho, K*L,1);reshape(X, nx*(N+1), 1); reshape(U, nu*N, 1)];
     %%
     success=0;
     iter = 1;
     
-    lau_history = cell(1,100);
+    rho_history = cell(1,100);
     exit_flag_history = cell(1,100);
     time_history = cell(1,100);
     obj_history = cell(1,100);
@@ -64,42 +64,42 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
               obj = obj + U(:,k)'*R*U(:,k);
             end
             % dynamics equality constraint
-            g = [g; X(:,k+1) - f(X(:,k), U(:,k),lau) ; -X(:,k+1) + f(X(:,k), U(:,k),lau)]; 
+            g = [g; X(:,k+1) - f(X(:,k), U(:,k),rho) ; -X(:,k+1) + f(X(:,k), U(:,k),rho)]; 
         end
         
         for i_=1:K
             for j_=1:L
                 if(i_==core(1) && j_==core(2))
-                    g = [g; lau(i_,j_)-1; -lau(i_,j_)+1];
+                    g = [g; rho(i_,j_)-1; -rho(i_,j_)+1];
                 else
                     %neighbor_sum = MX(0); 
                     neighbor_max = MX(0);
                     if i_ > 1 && i_>core(1)
-                        %neighbor_sum = neighbor_sum + lau(i_-1, j_);
-                        neighbor_max = fmax(neighbor_max, lau(i_-1, j_));
+                        %neighbor_sum = neighbor_sum + rho(i_-1, j_);
+                        neighbor_max = fmax(neighbor_max, rho(i_-1, j_));
                     end
                     if i_ < K && i_<core(1)
-                        %neighbor_sum = neighbor_sum + lau(i_+1, j_);
-                        neighbor_max = fmax(neighbor_max, lau(i_+1, j_));
+                        %neighbor_sum = neighbor_sum + rho(i_+1, j_);
+                        neighbor_max = fmax(neighbor_max, rho(i_+1, j_));
                     end
                     if j_ > 1 && j_>core(2)
-                        %neighbor_sum = neighbor_sum + lau(i_, j_-1);
-                        neighbor_max = fmax(neighbor_max, lau(i_, j_-1));
+                        %neighbor_sum = neighbor_sum + rho(i_, j_-1);
+                        neighbor_max = fmax(neighbor_max, rho(i_, j_-1));
                     end
                     if j_ < L && j_<core(2)
-                        %neighbor_sum = neighbor_sum + lau(i_, j_+1);
-                        neighbor_max = fmax(neighbor_max, lau(i_, j_+1));
+                        %neighbor_sum = neighbor_sum + rho(i_, j_+1);
+                        neighbor_max = fmax(neighbor_max, rho(i_, j_+1));
                     end
                     
-                    %g = [g; -lau(i_,j_); lau(i_,j_) - fmin(MX(1),neighbor_sum + eps) ];
-                    g = [g; -lau(i_,j_); lau(i_,j_) - neighbor_max ];
+                    %g = [g; -rho(i_,j_); rho(i_,j_) - fmin(MX(1),neighbor_sum + eps) ];
+                    g = [g; -rho(i_,j_); rho(i_,j_) - neighbor_max ];
                 end
                 
-                g = [g; lau(i_,j_)*(lau(i_,j_)-1)-eps; -lau(i_,j_)*(lau(i_,j_)-1)-eps];
+                g = [g; rho(i_,j_)*(rho(i_,j_)-1)-eps; -rho(i_,j_)*(rho(i_,j_)-1)-eps];
             end
         end
-        g = [g; sum1(sum2(lau))-num_AMs; -sum1(sum2(lau))+num_AMs ];
-        %g = [g; sum1(sum2(lau))-num_AMs];
+        g = [g; sum1(sum2(rho))-num_AMs; -sum1(sum2(rho))+num_AMs ];
+        %g = [g; sum1(sum2(rho))-num_AMs];
         
         g = [g; X(:,1) - x_0; -X(:,1) + x_0];
         g = [g; X(:,N+1) - x_f ; -X(:,N+1) + x_f];
@@ -138,13 +138,13 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
         
         disp(solver.stats.return_status)
         full_sol = full(sol.x);
-        current_lau = reshape(full_sol(1:K*L), K, L);
-        lau_history{iter} = current_lau;
+        current_rho = reshape(full_sol(1:K*L), K, L);
+        rho_history{iter} = current_rho;
         exit_flag_history{iter} = solver.stats.return_status;
         time_history{iter} = solver.stats.t_wall_total;
         obj_history{iter} = full(sol.f);
         fprintf("current object function value: %f\n", full(sol.f));
-        disp(current_lau)
+        disp(current_rho)
     
         success = solver.stats.success;
         eps = eps*gamma;
@@ -153,7 +153,7 @@ function [lau_opt, x_opt, u_opt, optimal_value,exit_flag,processing_time, lau_hi
     toc
     
     solution = full(sol.x);
-    lau_opt =reshape(solution(1:K*L), K, L);
+    rho_opt =reshape(solution(1:K*L), K, L);
     x_opt = reshape(solution(K*L+1 : K*L+nx*(N+1)), nx, N+1)';
     u_opt = reshape(solution(( K*L+nx*(N+1)+1 ):end), nu, N)';
     optimal_value = full(sol.f);

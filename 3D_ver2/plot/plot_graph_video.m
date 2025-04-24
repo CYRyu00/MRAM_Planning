@@ -22,7 +22,7 @@ legend({'$u_1$','$u_2$'}, ...
 title("motor inputs")
 axis tight;
 
-[AM_com, AM_mass, AM_inertia]  = get_inertia_double(lau_opt,K,L, core ,m0, I0, d);
+[AM_com, AM_mass, AM_inertia]  = get_inertia_double(rho_opt,K,L, core ,m0, I0, d);
 mass =  {mass_door(1), mass_door(2), mass_door(1), AM_mass};
 inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
 r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
@@ -30,7 +30,7 @@ r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], z
 wrench = zeros(N,6);
 tau = zeros(N,n);
 for i=1:N
-    wrench(i,:) = map_u2wrench_double( u_opt(i,3:end)',lau_opt,K,L, core , mu , r , d);
+    wrench(i,:) = map_u2wrench_double( u_opt(i,3:end)',rho_opt,K,L, core , mu , r , d);
     q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
     F_ext = wrench(i,:)';
     tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); u_opt(i,1); u_opt(i,2)] + ...
@@ -54,8 +54,8 @@ axis tight;
 
 %plot 3d video
 do_view=1; q =  [0;0;0;0]; g=[0;0;-9.81];
-robot = generate_door(n,dh,r_i_ci,d, g, lau_opt, core, mass,inertia, do_view,q);
+robot = generate_door(n,dh,r_i_ci,d, g, rho_opt, core, mass,inertia, do_view,q);
 
 slow_factor =1; force_scale = 0.2;
-%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
-plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
+%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho_opt, core, K, L)
+plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho_opt, core, K, L)

@@ -1,4 +1,4 @@
-function robot = generate_door(n,dh,r_i_ci,d, g, lau, core, mass_list,inertia_list, do_view,q)
+function robot = generate_door(n,dh,r_i_ci,d, g, rho, core, mass_list,inertia_list, do_view,q)
 robot = rigidBodyTree('DataFormat','column','MaxNumBodies',n+1);
 robot.Gravity = g';
 
@@ -34,7 +34,7 @@ for i = 1:4
     
     % Add visual box to the body
     if i == 4
-        [AMs_rows, AMs_cols] = find(lau >= 0.9);
+        [AMs_rows, AMs_cols] = find(rho >= 0.9);
         for j =1:length(AMs_cols)
             r = [ (core(2) - AMs_cols(j)) *-d ; (core(1) - AMs_rows(j)) *d ;0];% p_j,core
             r = -[r(1);0;r(2)];

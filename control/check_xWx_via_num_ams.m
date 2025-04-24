@@ -10,7 +10,7 @@ for num_AMs = num_AMs_arr
     shape_idx = zeros([K,L]);
     x_d = x_opt;
     u_d = zeros([N,4*num_AMs]);
-    [AMs_rows, AMs_cols] = find(lau_opt >= 0.9);
+    [AMs_rows, AMs_cols] = find(rho_opt >= 0.9);
     for i = 1:length(AMs_rows)
         shape(AMs_rows(i),AMs_cols(i)) = 1;
         shape_idx(AMs_rows(i),AMs_cols(i)) = i;

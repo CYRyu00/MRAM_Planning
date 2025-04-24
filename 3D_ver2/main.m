@@ -45,7 +45,7 @@ for k = t1/dt:(N-t1/dt)
     x_interp(k, 5:8) = [vel_x1;vel_x2;vel_x3;vel_x4];
 end
 
-CASE = 2;
+CASE = 1;
 thrust_scale = 1;
 tau_scale = 0;
 
@@ -53,44 +53,44 @@ u_max = thrust_limit *thrust_scale;
 u_min = thrust_limit *(-thrust_scale);
 tau_min = -0.2 *tau_scale ; 
 tau_max =  0.2 *tau_scale ;
-for MAX_ITER=[1000]
-    max_iter = MAX_ITER;
-    eps = 0.25;
-    gamma = 0.3;
 
-    fprintf("\nmax_iter: %d\n", MAX_ITER);
-        for num_AMs = 4:2:10
-            if CASE == 1
-                K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
-                mkdir data/result/hover/new_ref
-                filename = sprintf('data/result/hover/new_ref/%d_%d_%d.mat', num_AMs, thrust_scale , tau_scale);
-                %filename = sprintf('data/result/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
-            elseif CASE == 2
-                K=9; L=5 ; core=[5,1];
-                mkdir data/result_9_5/hover/new_ref_2
-                filename = sprintf('data/result_9_5/hover/new_ref_2/%d_%d_%d.mat', num_AMs, thrust_scale , tau_scale);
-                %filename = sprintf('data/result_9_5/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
-            elseif CASE == 3
-                K=11; L=6 ; core=[6,1];
-                filename = sprintf('data/result_11_6/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
-            end
-            fprintf("[K, L] = [%d , %d]\n", K,L);
-            
-            nu = 2 + K*L*4; zero_us = zeros(nu,1); 
-            lau_init = ones(K,L)/K/L*(num_AMs-1);
-            lau_init(core(1),core(2))=1;
-            X_init_guess = [reshape(lau_init,K*L,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
-            
-            %Solve NLP
-            [lau_opt, x_opt, u_opt, optimal_value, exit_flag, processing_time, lau_history, exit_flag_history, time_history] ....
-                      =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N,max_iter,eps,gamma);
-            fprintf("num AMs : %d\n", num_AMs);
-            fprintf("exit flag: %d \n", exit_flag);
-            fprintf("optimal value: %f \n", optimal_value);
-            fprintf("lau: \n"); disp(lau_opt)
-           
-            save(filename);
+max_iter = 2000;
+eps = 0.25;
+gamma = 0.3;
+
+fprintf("\nmax_iter: %d\n", MAX_ITER);
+    for num_AMs = 3:1:3
+        if CASE == 1
+            K = 2*num_AMs-1; L = num_AMs; core = [num_AMs,1];
+            filename = sprintf('data/test.mat');
+            %mkdir data/result/hover/new_ref
+            %filename = sprintf('data/result/hover/new_ref/%d_%d_%d.mat', num_AMs, thrust_scale , tau_scale);
+            %filename = sprintf('data/result/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
+        elseif CASE == 2
+            K=9; L=5 ; core=[5,1];
+            mkdir data/result_9_5/hover/new_ref_2
+            filename = sprintf('data/result_9_5/hover/new_ref_2/%d_%d_%d.mat', num_AMs, thrust_scale , tau_scale);
+            %filename = sprintf('data/result_9_5/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
+        elseif CASE == 3
+            K=11; L=6 ; core=[6,1];
+            filename = sprintf('data/result_11_6/hover/max_iter_%d/%d_%d_%d.mat', max_iter, num_AMs, thrust_scale , tau_scale);
         end
-end
+        fprintf("[K, L] = [%d , %d]\n", K,L);
+        
+        nu = 2 + K*L*4; zero_us = zeros(nu,1); 
+        rho_init = ones(K,L)/K/L*(num_AMs-1);
+        rho_init(core(1),core(2))=1;
+        X_init_guess = [reshape(rho_init,K*L,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
+        
+        %Solve NLP
+        [rho_opt, x_opt, u_opt, optimal_value, exit_flag, processing_time, rho_history, exit_flag_history, time_history] ....
+                  =  solve_nlp(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N,max_iter,eps,gamma);
+        fprintf("num AMs : %d\n", num_AMs);
+        fprintf("exit flag: %d \n", exit_flag);
+        fprintf("optimal value: %f \n", optimal_value);
+        fprintf("rho: \n"); disp(rho_opt)
+       
+        save(filename);
+    end
 %% plot
 plot_graph_video

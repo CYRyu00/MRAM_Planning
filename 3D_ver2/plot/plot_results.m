@@ -12,13 +12,13 @@ for num_AMs = 1:1:5
     opt_val_arr = [opt_val_arr; optimal_value];
     time_arr = [time_arr; processing_time];
     
-    %disp(lau_opt)
+    %disp(rho_opt)
     do_view=1; g=[0;0;-9.81];q=[0;0;0;0];
-    [AM_com, AM_mass, AM_inertia]  = get_inertia_double(lau_opt,K,L, core ,m0, I0, d);
+    [AM_com, AM_mass, AM_inertia]  = get_inertia_double(rho_opt,K,L, core ,m0, I0, d);
     mass =  {10, 1, 0.5, AM_mass};
     inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
     r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
-    robot = generate_door(n,dh,r_i_ci,d, g, lau_opt, core, mass,inertia, do_view,q);
+    robot = generate_door(n,dh,r_i_ci,d, g, rho_opt, core, mass,inertia, do_view,q);
 end
 
 figure

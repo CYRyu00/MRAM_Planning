@@ -1,4 +1,4 @@
-function [lau_opt, term_opt,flow_opt1,flow_opt2,flow_opt3,flow_opt4, x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
+function [rho_opt, term_opt,flow_opt1,flow_opt2,flow_opt3,flow_opt4, x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
           =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N)
 addpath("../../casadi-3.6.7-windows64-matlab2018b")
 import casadi.*
@@ -13,7 +13,7 @@ nu = 2 + K*L*4;
 
 x = MX.sym('x', nx, 1); % [q; qd];
 u = MX.sym('u', nu, 1);
-lau = MX.sym('lau', K,L); %shape
+rho = MX.sym('rho', K,L); %shape
 
 flow = cell(4,1);
 for d = 1:4
@@ -24,26 +24,26 @@ term = MX.sym('term', K, L);
 %% Dynamics
 %F_ext = [0;0;0;0;0;0]; tau = [0;0;0;0];
 
-[AM_com, AM_mass, AM_inertia] = get_inertia(lau,K,L, core ,m0, I0, d);
+[AM_com, AM_mass, AM_inertia] = get_inertia(rho,K,L, core ,m0, I0, d);
 mass =  {10, 1, 0.5, AM_mass};
 inertia = {eye(3)*1, eye(3)*0.01, eye(3)*0.01, AM_inertia, zeros(3,3)};
 r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
 
 tau = [-c_1*x(5);(-c_2*x(6) -kt*x(2) + mass{2}*0.80*9.81*0.040 ); u(1); u(2)] ;
-F_ext = map_u2wrench( u, lau,K,L, core , mu , r , d);
+F_ext = map_u2wrench( u, rho,K,L, core , mu , r , d);
 
 qdd = FD_ver2(n, dh, mass, inertia, r_i_ci, gravity, x(1:4), x(5:8), tau, F_ext);
 
 x_dot = [x(5:8);qdd];
 x_next = x + dt *  x_dot ; 
 % Create CasADi function for the dynamics
-f = Function('f', {x, u , lau}, {x_next});
+f = Function('f', {x, u , rho}, {x_next});
 % Flow per direction: 1=Up, 2=Down, 3=Left, 4=Right
 
 %%
 U = MX.sym('U', nu, N);
 X = MX.sym('X', nx, N+1);
-opt_variables = [reshape(lau, K*L,1); reshape(flow{1},K*L,1); reshape(flow{2},K*L,1); reshape(flow{3},K*L,1); reshape(flow{4},K*L,1); reshape(term,K*L,1);...
+opt_variables = [reshape(rho, K*L,1); reshape(flow{1},K*L,1); reshape(flow{2},K*L,1); reshape(flow{3},K*L,1); reshape(flow{4},K*L,1); reshape(term,K*L,1);...
                 reshape(X, nx*(N+1), 1); reshape(U, nu*N, 1)];
 %%
 obj = 0;
@@ -58,10 +58,10 @@ for k = 1:N
   obj = obj + U(:,k)'*R*U(:,k);
 
   % dynamics equality constraint
-  g = [g; X(:,k+1) - f(X(:,k), U(:,k),lau) ; -X(:,k+1) + f(X(:,k), U(:,k),lau)]; 
+  g = [g; X(:,k+1) - f(X(:,k), U(:,k),rho) ; -X(:,k+1) + f(X(:,k), U(:,k),rho)]; 
 end
 
-g = [g; lau(core(1),core(2))-1; -lau(core(1),core(2))+1];
+g = [g; rho(core(1),core(2))-1; -rho(core(1),core(2))+1];
 
 eps = 0.001;
 
@@ -101,7 +101,7 @@ for i_=1:K
             flow_in = MX(1);
             g = [g; term(i_,j_);-term(i_,j_) ];
         else
-            g = [g; lau(i_,j_)-fmin(1,flow_in);-lau(i_,j_)+fmin(1,flow_in)];
+            g = [g; rho(i_,j_)-fmin(1,flow_in);-rho(i_,j_)+fmin(1,flow_in)];
         end
         %flow_in = flow_out;
         g = [g; (flow_in*(1-term(i_,j_)) - flow_out);(-flow_in*(1-term(i_,j_)) + flow_out)];
@@ -110,12 +110,12 @@ for i_=1:K
             g = [g; flow{d}(i_,j_)*(flow{d}(i_,j_)-1)-eps; -flow{d}(i_,j_)*(flow{d}(i_,j_)-1)-eps];
             g = [g; -flow{d}(i_,j_); flow{d}(i_,j_)-1];
         end
-        %g = [g; lau(i_,j_)*(lau(i_,j_)-1)-eps; -lau(i_,j_)*(lau(i_,j_)-1)-eps];
+        %g = [g; rho(i_,j_)*(rho(i_,j_)-1)-eps; -rho(i_,j_)*(rho(i_,j_)-1)-eps];
         g = [g; term(i_,j_)*(term(i_,j_)-1)-eps; -term(i_,j_)*(term(i_,j_)-1)-eps];
        
     end
 end
-g = [g; sum1(sum2(lau))-num_AMs; -sum1(sum2(lau))+num_AMs ];
+g = [g; sum1(sum2(rho))-num_AMs; -sum1(sum2(rho))+num_AMs ];
 g = [g; sum1(sum2(term)) - 1; -sum1(sum2(term)) + 1]; % One terminal
 
 
@@ -157,7 +157,7 @@ sol = solver('x0',  X_init_guess, ...
 
 % Extract the optimal solution
 solution = full(sol.x);
-lau_opt =reshape(solution(1:K*L), K, L);
+rho_opt =reshape(solution(1:K*L), K, L);
 flow_opt1 =reshape(solution(K*L+1:K*L*2), K, L);
 flow_opt2 =reshape(solution(K*L*2+1:K*L*3), K, L);
 flow_opt3 =reshape(solution(K*L*3+1:K*L*4), K, L);
@@ -226,17 +226,17 @@ num_AMs = 4;
 %K = 2*num_AMs+1; L = num_AMs; core = [num_AMs+1,1];
 K=9;L=4;core=[5,1];
 nu = 2 + K*L*4; zero_us = zeros(nu,1); 
-lau_init = ones(K,L)/K/L*(num_AMs-1);
-lau_init(core(1),core(2))=1;
-X_init_guess = [reshape(lau_init,K*L,1);zeros(K*L*5,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
+rho_init = ones(K,L)/K/L*(num_AMs-1);
+rho_init(core(1),core(2))=1;
+X_init_guess = [reshape(rho_init,K*L,1);zeros(K*L*5,1);reshape(x_interp',(N+1)*8,1);repmat(zero_us, N, 1)];
 
 
 %Solve NLP
-[lau_opt, term_opt,flow_opt1,flow_opt2,flow_opt3,flow_opt4, x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
+[rho_opt, term_opt,flow_opt1,flow_opt2,flow_opt3,flow_opt4, x_opt, u_opt, optimal_value,exit_flag,processing_time] ....
           =  solve_NLP(params,num_AMs,K,L,core,dh,gravity,qo_desired,tau_min, tau_max, u_min,u_max,x_0,x_f,X_init_guess,dt,N);
 disp(exit_flag)
 disp(optimal_value)
-disp(lau_opt)
+disp(rho_opt)
 %% plot
 close all
 figure('Position',[800,100,800,600])
