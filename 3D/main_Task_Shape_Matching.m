@@ -1,3 +1,4 @@
+addpath("data\","dynamics\", "plot\", "params\")
 %Define Dynamic parameters and shapes
 n = 4;
 % dynamic parameters of each module 
@@ -11,7 +12,7 @@ dh = [0,0,0.95,0;   % [alpha, a, d, theta]
       pi/2,0,0,0];
 gravity = [0;0;-9.81];
 
-m = 9; 
+m = 8; 
 %K = 17; L = 9; core = [9,1];
 K = 2*m - 1 ; L = m; core = [m,1];
 all_shapes = generate_all_shapes(m,K,L,core);
@@ -107,7 +108,7 @@ for i= 6:1: min(9,m)
     elapsed_time = toc;  
     fprintf('Total time: %f seconds\n', elapsed_time);
     %% Save the result
-    file_name = sprintf("result/hover/%d_%d_%d", num_AMs,thrust_scale,tau_scale);
+    file_name = sprintf("data/result/hover/%d_%d_%d", num_AMs,thrust_scale,tau_scale);
     elapsed_time = sum(cell2mat(all_processing_time));
     
     save(file_name);
