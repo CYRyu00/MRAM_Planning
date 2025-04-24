@@ -1,7 +1,7 @@
 addpath("dynamics\","params\" ,"plot\")
-%% plot
-clear all
-load("..\3D_ver2\data\result_9_5\hover\max_iter_1000\10_3_0.mat")
+% plot
+%clear all
+%load("..\3D_ver2\data\result_9_5\hover\max_iter_1000\5_3_0.mat")
  
 close all
 figure('Position',[900,100,900,800])
@@ -57,5 +57,5 @@ do_view=1; q =  [0;0;0;0]; g=[0;0;-9.81];
 robot = generate_door(n,dh,r_i_ci,d, g, lau_opt, core, mass,inertia, do_view,q);
 
 slow_factor =1; force_scale = 0.2;
-save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
-%plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
+%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
+plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, lau_opt, core, K, L)
