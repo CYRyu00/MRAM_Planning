@@ -1,7 +1,8 @@
-3D/data/
-3D/images/
-3D_ver2/data/
-3D_ver2/images/
+planning_continous/data/
+planning_continous/images/
+planning_continous/data/
+planning_descite/images/
+planning_descitemages/
 control/images/
 
 *.mat
