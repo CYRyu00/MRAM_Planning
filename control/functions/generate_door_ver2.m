@@ -1,4 +1,4 @@
-function robot = generate_door_ver2(n,dh,r_i_ci,d, g, shape, mass_list,inertia_list, do_view,q)
+function robot = generate_door_ver2(n, dh, r_i_ci, d, g, shape, mass_list, inertia_list, do_view, q)
 robot = rigidBodyTree('DataFormat','column','MaxNumBodies',n+1);
 robot.Gravity = g';
 
