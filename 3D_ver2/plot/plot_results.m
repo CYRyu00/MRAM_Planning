@@ -3,8 +3,8 @@ close all
 num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
-for num_AMs = 1:1:5
-    filename = sprintf('data/result_9_5/hover/c1_10_times/%d_1_0.mat', num_AMs);
+for num_AMs = 1:1:23
+    filename = sprintf('data/result_9_5/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
    
@@ -57,12 +57,17 @@ end
 %%
 % optimal value
 close all
+plot_old_arr = 1:1:7;
+plot_full_arr = 1:1:10;
+plot_9_5_arr = 1:1:10;
+plot_11_6_arr = 1:1:10;
+
 num_AMs_arr=[];
 opt_val_arr=[];
 figure('Position',[300 500 500 400])
 
-for num_AMs = 1:1:7
-    filename = sprintf('data/old_result/hover/max_iter_2000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_old_arr
+    filename = sprintf('data/old_result/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     for idx = 1:length(cell2mat(all_optimal_value))
         if all_exit_flag{idx} == 0
@@ -81,8 +86,8 @@ plot(num_AMs_arr, opt_val_arr,'o-');
 num_AMs_arr=[];
 opt_val_arr=[];
 
-for num_AMs = 1:1:12
-    filename = sprintf('data/result/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_full_arr
+    filename = sprintf('data/result_full/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -93,8 +98,8 @@ plot(num_AMs_arr, opt_val_arr,'o-');
 
 num_AMs_arr=[];
 opt_val_arr=[];
-for num_AMs = 1:1:12
-    filename = sprintf('data/result_9_5/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_9_5_arr
+    filename = sprintf('data/result_9_5/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     num_AMs_arr = [num_AMs_arr ; num_AMs];
@@ -104,8 +109,8 @@ plot(num_AMs_arr, opt_val_arr,'o-');
 
 num_AMs_arr=[];
 opt_val_arr=[];
-for num_AMs = 1:1:5
-    filename = sprintf('data/result_11_6/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_11_6_arr
+    filename = sprintf('data/result_11_6/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -115,6 +120,7 @@ end
 plot(num_AMs_arr, opt_val_arr,'o-');
 
 grid on
+axis tight
 hold off
 xlabel("Number of Modules")
 title("Object Function value : f*")
@@ -125,8 +131,8 @@ num_AMs_arr=[];
 time_arr =[];
 figure('Position',[800 500 500 400])
 
-for num_AMs = 1:1:7
-    filename = sprintf('data/old_result/hover/max_iter_2000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_old_arr
+    filename = sprintf('data/old_result/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, elapsed_time)
     
@@ -138,8 +144,8 @@ plot(num_AMs_arr, time_arr/60,'o-');
 
 num_AMs_arr=[];
 time_arr =[];
-for num_AMs = 1:1:12
-    filename = sprintf('data/result/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_full_arr
+    filename = sprintf('data/result_full/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -150,8 +156,8 @@ plot(num_AMs_arr,time_arr/60,'o-');
 
 num_AMs_arr=[];
 time_arr =[];
-for num_AMs = 5:1:12
-    filename = sprintf('data/result_9_5/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_9_5_arr
+    filename = sprintf('data/result_9_5/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -162,8 +168,8 @@ plot(num_AMs_arr, time_arr/60,'o-');
 
 num_AMs_arr=[];
 time_arr =[];
-for num_AMs = 1:1:5
-    filename = sprintf('data/result_11_6/hover/max_iter_1000/%d_3_0.mat', num_AMs);
+for num_AMs = plot_11_6_arr
+    filename = sprintf('data/result_11_6/ref_1/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
     
@@ -173,6 +179,7 @@ end
 plot(num_AMs_arr, time_arr/60,'o-');
 
 grid on
+axis tight
 hold off
 xlabel("Number of Modules")
 ylabel("time [min]")
