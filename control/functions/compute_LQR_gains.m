@@ -1,10 +1,7 @@
-function K_arr = compute_LQR_gains(A_arr, B_arr, dt)
+function K_arr = compute_LQR_gains(A_arr, B_arr, Q, Qf, R, dt)
     N_sim = numel(A_arr);
     [nx, ~] = size(A_arr{1});
     [~, nu] = size(B_arr{1});
-    Q  = eye(nx);
-    Qf = eye(nx);
-    R  = eye(nu)*1e-2;
     P  = Qf;
     K_arr  = cell(1, N_sim);
     Ad_arr = cell(1, N_sim);

@@ -1,17 +1,21 @@
-function [x_dot_func, A_func, B_func] = define_dynamics(n, dh, shape, num_AMs, gravity, params)
+function [x_dot_func, A_func, B_func] = define_dynamics(shape, num_AMs, params)
     import casadi.*
-    
+
+    m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5}; 
+    thrust_limit= params{6}; kt = params{7}; c_1 = params{8}; c_2 = params{9}; mass_door = params{10}; 
+    handle_factor = params{11}; inertia = params{12}; r_i_ci = params{13}; n = params{14}; dh = params{15}; gravity = params{16};
+
     delta_inertia = MX.sym('delta_inertia',1,1);
     delta_k = MX.sym('delta_k',1,1);
     disturb = MX.sym('disturb',n,1);
-    params = define_params();
-    m0 = params{1} *delta_inertia; I0 = params{2}*delta_inertia; mass_door = params{10} *delta_inertia;
-    mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6}; kt=params{7} *delta_k; c_1=params{8}; c_2=params{9}; handle_factor = params{11};
     
+    m0 = m0 * delta_inertia; I0 = I0 * delta_inertia; mass_door = mass_door * delta_inertia;
+    kt = kt * delta_k;
+
     [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d);
     mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
-    inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
-    r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};
+    inertia{4} = AM_inertia;
+    r_i_ci{4} = [AM_com(1); 0; AM_com(2)];
     
     nx = n*2;
     nu = num_AMs*4;

@@ -1,4 +1,4 @@
-function [min_eigval_arr, max_eigval_arr,xT_W_r_x_arr ] = check_rechability_gramian(A_arr, B_arr, N_horizon, dt_sim, N_sim, n, do_print)
+function [min_eigval_arr, max_eigval_arr,xT_W_r_x_arr ] = check_rechability_gramian(A_arr, B_arr, N_horizon, dt_sim, N_sim, n, do_print, do_plot)
     min_eigval_arr = [];
     max_eigval_arr = [];
     xT_W_r_x_arr = [];
@@ -47,31 +47,33 @@ function [min_eigval_arr, max_eigval_arr,xT_W_r_x_arr ] = check_rechability_gram
         xT_W_r_x_arr = [xT_W_r_x_arr; xT_W_r_x];
     end
     
-    t_tmp = (1:N_sim - N_horizon + 1)*dt_sim;
-    figure('Position',[100 700 600 300])
-    hold on
-    plot( t_tmp, log(max_eigval_arr)/log(10))
-    plot( t_tmp, log(min_eigval_arr)/log(10))
-    legend("max eigen value", "min eigen value",'FontSize', 14,'Interpreter', 'latex')
-    xlabel('time[sec]' , 'FontSize', 14, 'Interpreter', 'latex')
-    ylabel( '$\log_{10}{(\lambda)}$','FontSize', 14,'Interpreter', 'latex')
-    title({'Eigenvalues of $W_r$ (log scale)'}, ...
-           'Interpreter','latex','FontSize',14);
-    grid on
-    
-    figure('Position',[100 300 600 300])
-    hold on
-    colors = lines(n);
-    for k=1:n
-        plot( t_tmp', log(xT_W_r_x_arr(:,k)),'Color', colors(k,:))
-        plot( t_tmp', log(xT_W_r_x_arr(:,k+n)),'Color', colors(k,:) , 'LineStyle','--')
-    end 
-    legend({'$q_1$', '$\dot{q_1}$','$q_2$','$\dot{q_2}$','$q_3$','$\dot{q_3}$','$q_4$','$\dot{q_4}$'}, ...
-           'Interpreter','latex','FontSize',14);
-    xlabel('time[sec]', 'FontSize', 14, 'Interpreter', 'latex')
-    ylabel( '$\log_{10}{(e_i^T W_r e_i)}$','FontSize', 14,'Interpreter', 'latex')
-    title({'$x^T W_r x$'}, ...
-           'Interpreter','latex','FontSize',14);
-    grid on
+    if do_plot
+        t_tmp = (1:N_sim - N_horizon + 1)*dt_sim;
+        figure('Position',[50 700 500 300])
+        hold on
+        plot( t_tmp, log(max_eigval_arr)/log(10))
+        plot( t_tmp, log(min_eigval_arr)/log(10))
+        legend("max eigen value", "min eigen value",'FontSize', 14,'Interpreter', 'latex')
+        xlabel('time[sec]' , 'FontSize', 14, 'Interpreter', 'latex')
+        ylabel( '$\log_{10}{(\lambda)}$','FontSize', 14,'Interpreter', 'latex')
+        title({'Eigenvalues of $W_r$ (log scale)'}, ...
+               'Interpreter','latex','FontSize',14);
+        grid on
+        
+        figure('Position',[550 700 500 300])
+        hold on
+        colors = lines(n);
+        for k=1:n
+            plot( t_tmp', log(xT_W_r_x_arr(:,k)),'Color', colors(k,:))
+            plot( t_tmp', log(xT_W_r_x_arr(:,k+n)),'Color', colors(k,:) , 'LineStyle','--')
+        end 
+        legend({'$q_1$', '$\dot{q_1}$','$q_2$','$\dot{q_2}$','$q_3$','$\dot{q_3}$','$q_4$','$\dot{q_4}$'}, ...
+               'Interpreter','latex','FontSize',14);
+        xlabel('time[sec]', 'FontSize', 14, 'Interpreter', 'latex')
+        ylabel( '$\log_{10}{(e_i^T W_r e_i)}$','FontSize', 14,'Interpreter', 'latex')
+        title({'$x^T W_r x$'}, ...
+               'Interpreter','latex','FontSize',14);
+        grid on
+    end
 end
 

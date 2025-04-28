@@ -1,4 +1,4 @@
-function wrench = map_u2wrench_double( u, shape , mu , r , d)
+function wrench = map_u2wrench_double(u, shape , mu , r , d)
     
     wrench = zeros(6,1);
     [core_row, core_col] = find(shape == 2);
