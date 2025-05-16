@@ -14,7 +14,7 @@ x_0 = [0; 0; 0; 0; 0; 0; 0; 0];
 x_f = [pi/4; 0; 0; 0; 0; 0; 0; 0];
 
 % Generate reference trajectory & initial guess of x
-t0 = 1; % cosine smoothing
+t0 = 1; % cosine smoothing 
 t1 = 1; % hovering time
 q_o_ref = generate_q_o_ref(x_0, x_f, N, dt, t0 ,t1);
 x_interp = generate_x_interp(x_0, x_f, N, dt, t1);
@@ -31,29 +31,34 @@ max_iter = 2000;
 eps = 0.25;
 gamma = 0.3;
 
-for num_AMs = 3:1:3
-    for CASE = -1:-1
+for num_AMs = 2:4:10
+    for CASE = -1
         if CASE == 1 && num_AMs > 10
             continue
         end
         if CASE == -1
             K = 2 * num_AMs - 1; L = num_AMs; core = [num_AMs, 1];
-            filename = sprintf("data/test.mat");
+            if num_AMs > 5
+                K = 9; L = 5; core = [5, 1];
+            end
+            mkdir data/Q2_1e0_1110/10sec
+            filename = sprintf('data/Q2_1e0_1110/10sec/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
         elseif CASE == 1
             K = 2 * num_AMs - 1; L = num_AMs; core = [num_AMs, 1];
-            mkdir data/result_full/ref_1
-            filename = sprintf('data/result_full/ref_1/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
+            mkdir data/result_full/ref_2
+            filename = sprintf('data/result_full/ref_2/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
         elseif CASE == 2
             K = 9; L = 5; core = [5, 1];
-            mkdir data/result_9_5/ref_1
-            filename = sprintf('data/result_9_5/ref_1/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
+            mkdir data/result_9_5/tool
+            filename = sprintf('data/result_9_5/tool/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
         elseif CASE == 3
             K = 11; L = 6; core = [6, 1];
-            mkdir data/result_11_6/ref_1
-            filename = sprintf('data/result_11_6/ref_1/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
+            mkdir data/result_11_6/ref_2
+            filename = sprintf('data/result_11_6/ref_2/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
         end
         fprintf("CASE = %d, [K, L] = [%d , %d]\n", CASE, K, L);
-        fprintf("max_iter = %d, eps = %.2f, gamma = %.2f\n\n", max_iter, eps, gamma);
+        fprintf("max_iter = %d, eps = %.2f, gamma = %.2f\n", max_iter, eps, gamma);
+        fprintf("file name : "); disp(filename);
 
         nu = 2 + K * L * 4; zero_us = zeros(nu, 1);
         rho_init = ones(K, L) / K / L * (num_AMs - 1);

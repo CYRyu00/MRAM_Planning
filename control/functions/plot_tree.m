@@ -3,7 +3,7 @@ x=x_opt;
 u=u_opt;
 
 n=4;
-figure('Position',[350, 50, 700, 550])
+figure('Position',[20, 50, 600, 500])
 
 show(robot,x(1,1:4)');
 view(2)
@@ -19,7 +19,7 @@ m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrus
 
 ax.View =[150,25];
 axis([-0.5 1.5 -0.5 1.5 0 2])
-camzoom(1.2);
+camzoom(1.3);
 
 for i = 1:dN:N
     

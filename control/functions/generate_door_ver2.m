@@ -37,14 +37,14 @@ for i = 1:4
         [AMs_rows, AMs_cols] = find(shape ~= 0);
         for j =1:length(AMs_cols)
             r = [ (core_col - AMs_cols(j)) *-d ; (core_row - AMs_rows(j)) *d ;0];% p_j,core
-            r = -[r(1);0;r(2)];
+            r = -[r(1); -r_i_ci{i}(2); r(2)];
             
-            addVisual(body, 'Box', box_size{i},trvec2tform( r'))
+            addVisual(body, 'Box', box_size{i}, trvec2tform( r'))
         end
     else
-        addVisual(body, 'Box', box_size{i},trvec2tform( r_i_ci{i}'));
+        addVisual(body, 'Box', box_size{i}, trvec2tform(r_i_ci{i}'));
     end
-    addVisual(body, 'Sphere', 0.03, trvec2tform( r_i_ci{i}'));
+    addVisual(body, 'Sphere', 0.03, trvec2tform(r_i_ci{i}'));
     
     % Attach body to robot
     if i == 1

@@ -18,7 +18,7 @@ rho = MX.sym('rho', K, L); %shape
 [AM_com, AM_mass, AM_inertia] = get_inertia(rho, K, L, core, m0, I0, d);
 mass = {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia{4} = AM_inertia;
-r_i_ci{4} = [AM_com(1); 0; AM_com(2)];
+r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];
 
 tau = [(- c_1 * x(5)); (- c_2 * x(6) - kt * x(2) + mass{2} * handle_factor ); u(1); u(2)] ;
 F_ext = map_u2wrench(u(3:end), rho, K, L, core, mu, r, d);
@@ -54,7 +54,7 @@ while( success==0 || eps> (0.005 * gamma)) && iter < 15
         elseif N - k <= t1 / dt
             obj = obj + (X(:, k) - x_f)' * Q3 * (X(:, k) - x_f);
         else
-            obj = obj + X(:, k)' * Q1 * X(:, k) + (X(1:4, k) - q_o_ref(:,k))' * Q2 * (X(1:4, k) - q_o_ref(:, k));
+            obj = obj + X(:, k)' * Q1 * X(:, k) + (X(1:4, k) - q_o_ref(:, k))' * Q2 * (X(1:4, k) - q_o_ref(:, k));
             obj = obj + U(:, k)' * R * U(:, k);
         end
         % dynamics equality constraint
@@ -128,8 +128,9 @@ while( success==0 || eps> (0.005 * gamma)) && iter < 15
     time_history{iter} = solver.stats.t_wall_total;
     obj_history{iter} = full(sol.f);
     fprintf("current object function value: %f\n", full(sol.f));
+    disp(solver.stats.return_status)
     disp(current_rho)
-
+    
     success = solver.stats.success;
     eps = eps * gamma;
     iter= iter + 1;

@@ -1,10 +1,10 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "../params")
-num_AMs_arr = 1:5;
+num_AMs_arr = 2:2:10;
 min_eigval_arr = [];
 xT_W_r_x_cell = cell(1, length(num_AMs_arr));
 
 for num_AMs = num_AMs_arr
-    filename = sprintf('../3D_ver2/data/result_9_5/ref_1/%d_1_0.mat', num_AMs);
+    filename = sprintf('../planning_continous/data/result_9_5/ref_4/%d_1_0.mat', num_AMs);
     load(filename)
     shape = zeros([K, L]);
     shape_idx = zeros([K, L]);

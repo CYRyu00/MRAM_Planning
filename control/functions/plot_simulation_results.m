@@ -1,6 +1,6 @@
 function plot_simulation_results(t_sim, x_sim, x_d_interp, u_sim, u_d_interp, disturb_sim, shape, dh, gravity, n, nx, nu, N_sim, dt_sim, delta_inertia, delta_k, sigma, mean, max_val)
 % plot trajectory and simulated x and u
-figure('Position',[1100 520 800 480])
+figure('Position',[1200 520 700 480])
 colors = lines(nx);
 legend_entries = cell(1, nx/2);
 subplot(3,1,1)
@@ -69,7 +69,7 @@ for i=1:N_sim
         newton_euler_inverse_dynamics_double(n, dh, mass_double, inertia_double, r_i_ci_double, gravity, q, qd, qdd, F_ext) ...
             + disturb_sim(i,:)';
 end
-figure('Position',[1100 50 800 400])
+figure('Position',[1200 50 700 400])
 subplot(2,1,1)
 plot(t_sim(1:end-1),wrench)
 

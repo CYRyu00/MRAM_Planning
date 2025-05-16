@@ -1,5 +1,5 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "casadi_functions", "functions", "../params" )
-clear; load("../3D_ver2/data/test.mat")
+clear; load("../planning_continous/data/result_9_5/ref_1/8_1_0.mat")
 close all;
 %%
 shape = zeros([K,L]);
@@ -31,20 +31,22 @@ delta_inertia = 1.0; delta_k = 1.0; disturb = [0; 0; 0; 0];
 N_horizon = 10; do_print = 0; do_plot = 1;
 [min_eigval_arr, max_eigval_arr, xT_W_r_x_arr] = check_rechability_gramian(A_nom_cell, B_nom_cell, N_horizon, dt_sim, N_sim, n, do_print, do_plot);
 
-Q  = diag([1,1,1,1,1,1,1,1]);
+Q  = diag([1, 1, 1, 1, 1, 1, 1, 1]);
 Qf = Q;
-R  = eye(nu) * 1e-1;
+R  = eye(nu) * 1e-2;
 K_arr = compute_LQR_gains(A_nom_cell, B_nom_cell, Q, Qf, R, dt_sim);
 %% Simulation
 delta_inertia_nom = 1.0; delta_k_nom = 1.0;
 delta_inertia = 1.0; delta_k = 1.0;
-sigma = 0.0; mean = 0.00; max_val = 0.5;
+sigma = 0.0; mean = 0.10; max_val = 0.5;
 
 x_sim = zeros(N_sim + 1, nx); x_sim(1,:) = x_d_interp(1,:);
 u_sim = zeros(N_sim, nu);
 
 disturb_sim = zeros(N_sim, n);
-disturb = mean * ones(n,1);
+disturb = mean * [1; 1; 1; 1];
+
+delay = 0;
 
 rng('shuffle')
 for i = 1:N_sim
@@ -53,7 +55,11 @@ for i = 1:N_sim
     disturb = min(max(disturb, - max_val), max_val);
     disturb_sim(i,:) = disturb;
 
-    u_fb = u_d_interp(i,:)' - K_arr{i}*(x_sim(i,:)' - x_d_interp(i,:)');
+    if i > delay
+        u_fb = u_d_interp(i - delay, :)' - K_arr{i - delay}*(x_sim(i- delay, :)' - x_d_interp(i- delay, :)');
+    else
+        u_fb = u_d_interp(i, :)' - K_arr{i}*(x_sim(i, :)' - x_d_interp(i, :)');
+    end
 
     x_dot_act = full( x_dot_func(x_sim(i,:), u_fb, delta_inertia, delta_k, disturb) );
 
@@ -71,7 +77,7 @@ plot_simulation_results(t_sim, x_sim, x_d_interp, u_sim, u_d_interp, disturb_sim
 [AM_com, AM_mass, AM_inertia] = get_inertia(shape, m0, I0, d);
 mass = {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia{4} = AM_inertia;
-r_i_ci{4} = [AM_com(1); 0; AM_com(2)];
+r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];
 
 slow_factor = 1; force_scale = 0.2; do_view = 0; q = [0; 0; 0; 0];
 robot = generate_door_ver2(n, dh, r_i_ci, d, gravity, shape, mass, inertia, do_view, q);

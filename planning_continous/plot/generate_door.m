@@ -37,7 +37,7 @@ for i = 1:4
         [AMs_rows, AMs_cols] = find(rho >= 0.9);
         for j =1:length(AMs_cols)
             r = [ (core(2) - AMs_cols(j)) *-d ; (core(1) - AMs_rows(j)) *d ;0];% p_j,core
-            r = -[r(1);0;r(2)];
+            r = [-r(1); r_i_ci{i}(2); -r(2)];
             
             addVisual(body, 'Box', box_size{i},trvec2tform( r'))
         end

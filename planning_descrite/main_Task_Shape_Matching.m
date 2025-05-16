@@ -7,7 +7,7 @@ m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};
 thrust_limit= params{6}; kt = params{7}; c_1 = params{8}; c_2 = params{9}; mass_door = params{10};
 handle_factor = params{11}; inertia = params{12}; r_i_ci = params{13}; n = params{14}; dh = params{15}; gravity = params{16};
 
-m = 5;
+m = 8;
 %K = 17; L = 9; core = [9,1];
 K = 2 * m - 1; L = m; core = [m, 1];
 
@@ -35,7 +35,7 @@ u_min = thrust_limit * (- thrust_scale);
 tau_min = -0.2 * tau_scale;
 tau_max =  0.2 * tau_scale;
 
-for i= 2:1:min(2,m)
+for i= 4:1:min(7,m)
     num_AMs = i;
     shapes = all_shapes{i};
 
@@ -82,12 +82,12 @@ for i= 2:1:min(2,m)
     % Save the result
     mkdir data\old_result\ref_1
     file_name = sprintf("data/old_result/ref_1/%d_%d_%d", num_AMs, thrust_scale, tau_scale);
-    file_name = sprintf("data/old_result/test.mat");
+    %file_name = sprintf("data/old_result/test.mat");
     save(file_name);
 
-    mkdir ..\3D_ver2\data\old_result\ref_1
-    file_name = sprintf("../3D_ver2/data/old_result/ref_1/%d_%d_%d", num_AMs, thrust_scale, tau_scale);
-    file_name = sprintf("../3D_ver2/data/old_result/test.mat");
+    mkdir ..\planning_continous\data\old_result\ref_1
+    file_name = sprintf("../planning_continous/data/old_result/ref_1/%d_%d_%d", num_AMs, thrust_scale, tau_scale);
+    %file_name = sprintf("../3planning_continous/data/old_result/test.mat");
     save(file_name);
 end
 %%
