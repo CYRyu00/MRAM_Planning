@@ -1,6 +1,6 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "casadi_functions", "functions", "../params" )
 clear; 
-load("../planning_continous/data/Q2_1e0_1110/10sec/10_1_0.mat")
+load("../planning_continous/data/Q2_1e0_1110/10sec/6_1_0.mat")
 close all;
 %% CONTROL GAIN
 alpha = 1e-2; beta = 1e-4; % 1e-2 / 1e-4
