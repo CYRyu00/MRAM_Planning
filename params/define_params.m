@@ -28,3 +28,4 @@ dh = [0, 0, 0.95, 0;   % [alpha, a, d, theta]
 gravity = [0; 0; -9.81];
 
 params = {m0, I0, mu, r, d, thrust_limit, kt, c_1, c_2, mass_door, handle_factor, inertia, r_i_ci, n, dh, gravity};
+end

@@ -9,7 +9,7 @@ show(robot,x(1,1:4)');
 view(2)
 ax = gca;
 hold on
-dN = 1;
+dN = 10;
 framesPerSecond = 1/dt*slow_factor/dN;
 rate = rateControl(framesPerSecond);
 

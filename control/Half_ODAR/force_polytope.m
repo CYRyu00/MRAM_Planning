@@ -16,7 +16,7 @@ rows = ceil(num_figs / cols);
 
 fig_width = 400;   
 fig_height = 250;  
-x_gap = 10;        
+x_gap = 20;        
 y_gap = 90;      
 screen_offset_x = 50;
 screen_offset_y = 50;
@@ -30,7 +30,9 @@ for eta = eta_arr
              s/sqrt(2), - s/sqrt(2), - s/sqrt(2), s/sqrt(2);
              - s/sqrt(2), - s/sqrt(2), s/sqrt(2), s/sqrt(2);
              c, c, c, c];
+    fprintf("eta : %.1f\n", eta /pi *180)
     fprintf("rank A_eta: %d\n", rank(A_eta));
+    disp(A_eta)
     D = 2*d;
     p=[];
     p(:,1) = [0; 0; 0]; p(:,2) = [D; 0; 0]; % p(:,3) = [D; 0; 0];

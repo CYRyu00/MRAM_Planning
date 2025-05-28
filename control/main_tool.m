@@ -5,7 +5,13 @@ close all;
 %% CONTROL GAIN
 alpha = 1e-2; beta = 1e-4; % 1e-2 / 1e-4
 b = 2e-1; k = 3e-1; % 2e-1/ 3e -1
-do_video = true;
+
+alpha = 5e-2; beta = 1e-4;     %5e-2 / 1e-4
+w_n = 2 * pi * 0.3; damp = 2.0; % 0.6 pi/ 2.0
+b = 2* m0 * damp * w_n; k = m0 * w_n^2; 
+
+do_video = false;
+save_video = false;
 %% Parsing and Interpolation 
 shape = zeros([K,L]);
 x_d = x_opt; u_d = zeros([N, 4 * num_AMs]);
@@ -196,6 +202,9 @@ if do_video
     slow_factor = 1; force_scale = 0.2; do_view = 0; q = [0; 0; 0; 0];
     robot = generate_door_ver2(n, dh, r_i_ci, d, gravity, shape, mass, inertia, do_view, q);
     
-    %save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
-    plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+    if save_video
+        save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+    else
+        plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+    end
 end
