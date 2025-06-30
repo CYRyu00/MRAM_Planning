@@ -19,7 +19,7 @@ kw = 2 * damp * sqrt(max(max(I0)) * kR);
 
 fprintf("\nkp: %f, kv %f\n", kp, kv);
 fprintf("\nkR: %f, kw %f\n", kR, kw);
-X_hover = [1; 2; 3] * 1e-1; yaw_hover = 10 / 180 *pi; 
+X_hover = [1; 2; 3] * 1e-1; yaw_hover = 100 / 180 *pi; 
 L_f = eye(3) * 10;
 L_tau = eye(3) * 100;
 
@@ -57,19 +57,9 @@ ep_hist = []; ev_hist = []; eR_hist = []; ew_hist = [];
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(X_hover, yaw_hover, N_sim, dt_sim);
 
 for i = 1:N_sim
-    fprintf("\n\ntime step: %d\n", i);
-    % External wrench & wrench estimator
-    % TODO estimation by observed w_dot, w or noisy
-    f_e = 0 * [0; 0; 0.02] * sin(i/100); 
+    f_e = 0 * [0; 0; 0.01] * sin(i/100); 
     tau_e = 0 * [3; 2; 1] * 1e-4 * sin(i/100);
-    f_hat  = f_hat  + L_f * (f_e  - f_hat) * dt_sim;
-    tau_hat = tau_hat + L_tau * (tau_e - tau_hat) * dt_sim;
-    
-    f_hat_hist   = [f_hat_hist, f_hat];
-    tau_hat_hist = [tau_hat_hist, tau_hat];
-    f_e_hist     = [f_e_hist, f_e];
-    tau_e_hist   = [tau_e_hist, tau_e];
-    
+    fprintf("\n\ntime step: %d\n", i);
     % Geometric Controller w/ tilted quadrotor
     % Position control
     ep = X - X_des(:, i);
@@ -96,13 +86,13 @@ for i = 1:N_sim
     ew = w - R' * R_des * w_des;
     tau_des = - kR * eR - kw * ew + S(w) * I0 * w ...
               - I0 * (S(w) * R' * R_des * w_des - R' * R_des * wd_des) - tau_hat;
-    
-    % Dynamics
+
     fprintf("tau_des: %f,  %f,  %f\n", tau_des(1), tau_des(2), tau_des(3));
     thrusts = solve_QP_mapping(A_force, A_tau, tau_des, force, thrust_min, thrust_max, R, eta);
     fprintf("thrust : %f, %f, %f, %f\n", thrusts(1), thrusts(2), thrusts(3), thrusts(4))
     thrusts_hist = [thrusts_hist, thrusts];
 
+    % Dynamics
     [Xdd, wd_fd, Rd] = ForwardDynamics(X, Xd, w, wd, R, f_e, tau_e, thrusts, A_theta, params);
 
     X  = X + Xd * dt_sim + 0.5 * Xdd * dt_sim^2 ;
@@ -124,6 +114,20 @@ for i = 1:N_sim
     eR_hist = [eR_hist, eR];
     ew_hist = [ew_hist, ew];
     times = [times; i * dt_sim];
+
+
+    % External wrench & wrench estimator
+    % TODO estimation with noisy wd and Xdd
+    f_e_hat = m0 * Xdd - R * A_force * thrusts + m0 * norm(gravity) * [0; 0; 1];
+    tau_e_hat = I0 * wd + S(w) * I0 * w - A_tau * thrusts;
+
+    f_hat  = f_hat  + L_f * (f_e_hat  - f_hat) * dt_sim;
+    tau_hat = tau_hat + L_tau * (tau_e_hat - tau_hat) * dt_sim;
+    
+    f_hat_hist   = [f_hat_hist, f_hat];
+    tau_hat_hist = [tau_hat_hist, tau_hat];
+    f_e_hist     = [f_e_hist, f_e];
+    tau_e_hist   = [tau_e_hist, tau_e];
 end
 
 %% State plot
@@ -265,8 +269,8 @@ sgtitle('Tracking Errors','Interpreter','latex','FontSize', 16);
 function [Xdd, wd_fd, Rd] = ForwardDynamics(X, Xd, w, wd, R, f_e, tau_e, thrusts, A_theta, params)
     m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; gravity = params{16};
     %m0 = 4.34; I0 = diag([0.082, 0.084, 0.130]);
-
-    wrench = A_theta * thrusts;
+    %m0 = m0 * 1.05; I0 = I0 * 1.05; 
+    wrench = A_theta * thrusts; 
     tau = wrench(1:3);
     force = wrench(4:6);
     fprintf("Real tau; force : %f, %f, %f, %f\n", tau(1), tau(2), tau(3), norm(force));

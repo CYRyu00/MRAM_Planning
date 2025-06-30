@@ -1,6 +1,6 @@
 function [X_des, Xd_des, Xdd_des, ...
-          yaw_des, yawd_des, yawdd_des] = get_traj_helix(X_hover, yaw_hover, ...
-                                                         N_sim, dt_sim)
+          yaw_des, yawd_des, yawdd_des] = get_traj_helix(r, omega, omega_yaw, v_z, ...
+                                            X_hover, yaw_hover,N_sim, dt_sim)
 % GET_TRAJ_HELIX  Helical reference trajectory (position–velocity–acceleration & yaw)
 %
 %   INPUTS
@@ -16,11 +16,6 @@ function [X_des, Xd_des, Xdd_des, ...
 %     yaw_des  – 1×N_sim   : yaw
 %     yawd_des – 1×N_sim   : yaw 속도
 %     yawdd_des– 1×N_sim   : yaw 가속도
-
-    %% Trajectory design parameters (수정 가능)
-    r     = 0.5;        % [m]   수평 반지름
-    omega = 0.6;        % [rad/s]  회전 각속도 (2π rad ≈ 한 바퀴)
-    v_z   = 0.05;       % [m/s]  수직 상승(음수면 하강)
 
     %% 사전 할당 (pre-allocation)
     X_des   = zeros(3, N_sim);
@@ -56,10 +51,10 @@ function [X_des, Xd_des, Xdd_des, ...
 
         %── yaw  (진행 방향을 바라보도록 설정) ───────────────────
         %   yaw = atan2(ŷ속도, ẋ속도)  ;  필요시 yaw_hover 오프셋 추가
-        yaw   = atan2(ydot, xdot) + yaw_hover;
-        yawd  = omega;          % 등속 회전이므로 상수
+        yaw   = omega_yaw * t + yaw_hover;
+        yawd  = omega_yaw;          % 등속 회전이므로 상수
         yawdd = 0;
-
+                
         yaw_des(k)   = wrapToPi(yaw);
         yawd_des(k)  = yawd;
         yawdd_des(k) = yawdd;
