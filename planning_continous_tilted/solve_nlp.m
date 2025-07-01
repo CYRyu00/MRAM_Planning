@@ -15,7 +15,7 @@ u = MX.sym('u', nu, 1);
 rho = MX.sym('rho', K, L); %shape
 
 %% Dynamics
-[AM_com, AM_mass, AM_inertia] = get_inertia(rho, K, L, core, m0, I0, d);
+[AM_com, AM_mass, AM_inertia] = get_inertia_duo(rho, K, L, core, m0, I0, d);
 mass = {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia{4} = AM_inertia;
 r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];

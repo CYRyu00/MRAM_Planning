@@ -31,18 +31,18 @@ legend({'$u_1$','$u_2$'}, ...
 title("motor inputs")
 axis tight;
 
-[AM_com, AM_mass, AM_inertia]  = get_inertia_double(rho_opt,K,L, core ,m0, I0, d);
-mass =  {mass_door(1), mass_door(2), mass_door(3), AM_mass};
+[AM_com, AM_mass, AM_inertia]  = get_inertia_duo_double(rho_opt,K,L, core ,m0, I0, d);
+mass = {mass_door(1), mass_door(2), mass_door(3), AM_mass};
 inertia{4} = AM_inertia;
-r_i_ci{4} = [AM_com(1); r_i_ci{4}(2) ; AM_com(2)];
+r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];
 
 wrench = zeros(N,6);
 tau = zeros(N,n);
 for i=1:N
-    wrench(i,:) = map_u2wrench_double( u_opt(i,3:end)',rho_opt,K,L, core , mu , r , d);
+    wrench(i,:) = map_u2wrench_double(u_opt(i,:)', rho_opt, K, L, core, mu, r, d, theta);
     q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
     F_ext = wrench(i,:)';
-    tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); u_opt(i,1); u_opt(i,2)] + ...
+    tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); 0; 0] + ...
         newton_euler_inverse_dynamics_double(n, dh, mass, inertia, r_i_ci, gravity, q, qd, qdd, F_ext);
 end
 subplot(4,1,3)
@@ -61,9 +61,9 @@ title("generalized force")
 axis tight;
 
 %plot 3d video
-do_view=1; q = [0;0;0;0]; g=[0;0;-9.81];
-robot = generate_door(n,dh,r_i_ci,d, g, rho_opt, core, mass,inertia, do_view,q);
+do_view = 1; q = [0;0;0;0]; g = [0; 0; -9.81];
+robot = generate_door(n, dh, r_i_ci, d, g, rho_opt, core, mass, inertia, do_view, q);
 
-slow_factor =1; force_scale = 0.2;
-%save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho_opt, core, K, L)
-plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho_opt, core, K, L)
+slow_factor = 1; force_scale = 0.2;
+%save_plot_tree(robot, dh, params, theta, x_opt, u_opt, dt, N, slow_factor, force_scale, rho_opt, core, K, L)
+plot_tree(robot, dh, params, theta, x_opt, u_opt, dt, N, slow_factor, force_scale, rho_opt, core, K, L)

@@ -1,4 +1,4 @@
-function save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, rho, core, K, L)
+function save_plot_tree(robot,dh, params, theta, x_opt, u_opt, dt, N, slow_factor, force_scale, rho, core, K, L)
 x=x_opt;
 u=u_opt;
 
@@ -45,14 +45,14 @@ for i = 1:N
         p_05 = T_05(1:3, 4);
         R_05 = T_05(1:3, 1:3);
         
-        wrench =  map_u2wrench_double(u(i,3:end)', rho,K,L, core , mu , r , d);
+        wrench = map_u2wrench_double(u(i,:)', rho, K, L, core, mu, r, d, theta);
 
         % Force
         f_w = R_05 *wrench(4:6);   
         p1 = p_05;
         %p1 = p_05;
         p2 = p1 + f_w*force_scale;
-        plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],colors( 1), 'LineWidth',1);
+        plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],colors(1), 'LineWidth',1);
     
         % moment
         m_w = R_05 *wrench(1:3);   
@@ -60,22 +60,6 @@ for i = 1:N
         %p1 = p_05;
         p2 = p1 + m_w*force_scale;
         plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],colors(2), 'LineWidth',1);
-
-        % moment
-        p_03 = T_03(1:3, 4);
-        R_03 = T_03(1:3, 1:3);
-        m_w = R_03 *[0;0;1] *u(3);   
-        p1 = p_03;
-        p2 = p1 + m_w*force_scale;
-        plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],colors(3), 'LineWidth',1);
-
-        % moment
-        p_04 = T_04(1:3, 4);
-        R_04 = T_04(1:3, 1:3);
-        m_w = R_04 *[0;0;1] *u(3);   
-        p1 = p_04;
-        p2 = p1 + m_w*force_scale;
-        plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],colors(3), 'LineWidth',1);
 
         if false
             hold off

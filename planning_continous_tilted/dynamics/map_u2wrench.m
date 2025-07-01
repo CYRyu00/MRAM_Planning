@@ -1,4 +1,4 @@
-function wrench = map_u2wrench(u, rho,k,l, core , mu , r , d, theta)
+function wrench = map_u2wrench(u, rho, k, l, core, mu, r, d, theta)
     import casadi.*
     wrench = MX.zeros(6,1);
     
@@ -10,16 +10,15 @@ function wrench = map_u2wrench(u, rho,k,l, core , mu , r , d, theta)
          - s/sqrt(2), - s/sqrt(2), s/sqrt(2), s/sqrt(2);
          c, c, c, c];
     
-    p1 = [-0.5 * d; 0; 0]; p2 = [0.5 * d; 0; 0]; % p(:,3) = [D; 0; 0];
-    R1 = eye(3,3); R2 = [0 -1 0;1 0 0; 0 0 1]; % R{3} = eye(3,3);
-    
+    p1 = [-0.5 * d; 0; 0]; p2 = [0.5 * d; 0; 0]; 
+    R1 = eye(3,3); R2 = [0 -1 0;1 0 0; 0 0 1]; 
     A_duo = [Ad(R1, p1) * A_theta, Ad(R2, p2) * A_theta];
     
     for i=1:k
         for j=1:l
-            r = [ (core(2) - j) * -2 *d ; (core(1) - i) *d ;0];% p_j,core
-            F_bi = rho(i,j) * A_duo * u( 8*((i-1)*l + j) - 7 : 8*((i-1)*l + j) );% [ moment; force]
-            wrench(1:3) = wrench(1:3) + F_bi(1:3) - cross(r,F_bi(4:6));
+            r = [ (core(2) - j) * -2 * d ; (core(1) - i) * d ;0];% p_j,core
+            F_bi = rho(i,j) * A_duo * u( 8*((i-1)*l + j) - 7 : 8*((i-1)*l + j) );% [moment; force]
+            wrench(1:3) = wrench(1:3) + F_bi(1:3) - cross(r, F_bi(4:6));
             wrench(4:6) = wrench(4:6) + F_bi(4:6);
         end
     end
