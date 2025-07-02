@@ -1,6 +1,6 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "casadi_functions", "functions", "../params" )
 clear; close all;
-load("../planning_continous_tilted/data/Q2_1e0_1110/1_1_0.mat")
+load("../planning_continous_tilted/data/Q2_1e0_1110/2_1_0.mat")
 
 m_duo = 2 * m0;
 D = [0.5 * d; 0; 0];
@@ -17,7 +17,7 @@ k_d_z = 2 * damp * sqrt(m_duo * k_p_z);
 k_p = diag([k_p_x, k_p_x, k_p_z]);
 k_d = diag([k_d_x, k_d_x, k_d_z]);
 
-wn = 0.05; damp = 0.9; % 3 / 1.2
+wn = 1.0; damp = 1.2; % 1 / 1.2
 k_R = m_duo * wn^2;
 k_w = 2 * damp * sqrt(m_duo * k_R);  
 
@@ -114,14 +114,14 @@ for i = 1:N_sim_tmp %N_sim
     R = T_0i{4}(1:3, 1:3) * R_45;
     X = T_0i{4}(1:3, 4);
     Xd = v_cell{4};
-    w = R_45 * w_cell{4};
+    w = R_45' * w_cell{4};
     
     % get desired states
     [T_0i_des, w_cell_des, v_cell_des] = get_T_w_v(x_d_interp(i, 1:n)', x_d_interp(i, n+1:end)', dh, n);
     R_des = T_0i_des{4}(1:3, 1:3) * R_45;
     X_des = T_0i_des{4}(1:3, 4);
     Xd_des = v_cell_des{4};
-    w_des = R_45 * w_cell_des{4};
+    w_des = R_45' * w_cell_des{4};
     if i == 1
         w_des_prev = w_des;
     end
@@ -151,7 +151,7 @@ for i = 1:N_sim_tmp %N_sim
                  - I_duo * (S(w) * R_des * w_des - R_des * wd_des);
         u_fb(8 * j - 7 : 8 * j) = A_dagger * [tau_; force_];
     end
-    u_fb = u_d_interp(i, :);
+    %u_fb = u_d_interp(i, :);
     x_dot = full(x_dot_func(x_sim(i,:), u_fb, delta_inertia, delta_k, disturb));
     
     u_sim(i, :) = u_fb';
@@ -198,7 +198,7 @@ grid on
 subplot(2,2,4)
 plot(times, e_d_hist)
 legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
-title('$e_{pd}$', 'Interpreter','latex','FontSize', 14)
+title('$e_{d}$', 'Interpreter','latex','FontSize', 14)
 grid on
 
 if do_video

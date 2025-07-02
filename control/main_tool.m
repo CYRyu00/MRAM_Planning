@@ -6,12 +6,15 @@ close all;
 alpha = 1e-2; beta = 1e-4; % 1e-2 / 1e-4
 b = 2e-1; k = 3e-1; % 2e-1/ 3e -1
 
-alpha = 5e-2; beta = 1e-4;     %5e-2 / 1e-4
-w_n = 2 * pi * 0.3; damp = 2.0; % 0.6 pi/ 2.0
-b = 2* m0 * damp * w_n; k = m0 * w_n^2; 
+alpha = 7e-2; beta = 1e-5;     %5e-2 / 1e-4
 
-do_video = false;
+w_n = 2 * pi * 0.02; damp = 1.0; % 0.6 pi/ 2.0
+b = 2* m0 * damp * w_n;
+k = m0 * w_n^2; 
+
+do_video = true;
 save_video = false;
+dN = 10;
 %% Parsing and Interpolation 
 shape = zeros([K,L]);
 x_d = x_opt; u_d = zeros([N, 4 * num_AMs]);
@@ -89,14 +92,14 @@ for i = 1:N_sim
     R = T_0i{4}(1:3, 1:3) * R_45;
     X = T_0i{4}(1:3, 4);
     Xd = v_cell{4};
-    w = R_45 * w_cell{4};
+    w = R_45' * w_cell{4};
     
     % get desired states
     [T_0i_des, w_cell_des, v_cell_des] = get_T_w_v(x_d_interp(i, 1:n)', x_d_interp(i, n+1:end)', dh, n);
     R_des = T_0i_des{4}(1:3, 1:3) * R_45;
     X_des = T_0i_des{4}(1:3, 4);
     Xd_des = v_cell_des{4};
-    w_des = R_45 * w_cell_des{4};
+    w_des = R_45' * w_cell_des{4};
     
     % calculate decentralized control thrusts
     for j = 1:length(AMs_rows)
@@ -128,7 +131,7 @@ for i = 1:N_sim
     x_sim(i+1,:) = x_sim(i,:) + x_dot' * dt_sim;
 
     [wd_cell] = get_wd(x_sim(i, 1:n)', x_sim(i, n+1:end)', x_dot(n+1:end)', dh, n);
-    wd = wd_cell{4};
+    wd = R_45' * wd_cell{4};
     j = 1; %you could chose 1 ~ num_AMs
     Yd_err(i, :) = Yd{j} - Yd_des{j};
     Y_err(i, :) = Y{j} - Y_des{j};
@@ -153,21 +156,25 @@ subplot(3,2,1)
 plot(times, Y_err)
 legend({'$Y_1$', '$Y_2$', '$Y_3$'}, 'Interpreter','latex', 'FontSize',10)
 title('${Y}$ error', 'Interpreter','latex','FontSize', 14)
+grid on
 
 subplot(3,2,2)
 plot(times, Yd_err)
 legend({'$\dot{Y}_1$', '$\dot{Y}_2$', '$\dot{Y}_3$'}, 'Interpreter','latex', 'FontSize',10)
 title('$\dot{{Y}}$ error', 'Interpreter','latex','FontSize', 14)
+grid on
 
 subplot(3,2,3)
 plot(times, w_err)
 legend({'$\omega_1$', '$\omega_2$', '$\omega_3$'}, 'Interpreter','latex', 'FontSize',10)
 title('$\mathbf{\omega}$ error', 'Interpreter','latex','FontSize', 14)
+grid on
 
 subplot(3,2,4)
 plot(times, wd_err)
 legend({'$\dot{\omega}_1$', '$\dot{\omega}_2$', '$\dot{\omega}_3$'}, 'Interpreter','latex', 'FontSize',10)
 title('$\dot{\mathbf{\omega}}$ error', 'Interpreter','latex','FontSize', 14)
+grid on
 
 subplot(3,2,5)
 hold on
@@ -178,6 +185,7 @@ end
 legend({'$\dot{\omega}_1$', '$\dot{\omega}_2$', '$\dot{\omega}_3$'}, ...
        'Interpreter','latex', 'FontSize', 10);
 title('$\dot{\mathbf{\omega}}$', 'Interpreter', 'latex', 'FontSize', 14)
+grid on
 
 subplot(3,2,6)
 hold on
@@ -191,7 +199,7 @@ legend({'$\dot{\omega}_1$', '$\dot{\omega}_1^{\mathrm{des}}$', ...
         '$\dot{\omega}_3$', '$\dot{\omega}_3^{\mathrm{des}}$'}, ...
        'Interpreter', 'latex', 'FontSize', 10);
 title('$\dot{\mathbf{\omega}}$ vs $\dot{\mathbf{\omega}}_{\mathrm{des}}$', 'Interpreter','latex','FontSize', 14)
-
+grid on
 
 if do_video
     [AM_com, AM_mass, AM_inertia] = get_inertia(shape, m0, I0, d);
@@ -205,6 +213,6 @@ if do_video
     if save_video
         save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
     else
-        plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+        plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape, dN)
     end
 end

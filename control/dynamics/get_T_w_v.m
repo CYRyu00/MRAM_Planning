@@ -10,8 +10,9 @@ q = [q; 0];
 % Forward recursion
 for i = 1:n
     R = R_DH(DH(i,:), q(i));
-    p = p_DH(DH(i,:));
-    T = [R p; 0 0 0 1];
+    p_prev = p_DH(DH(i,:));
+    p = p_DH(DH(i+1,:)); % i+1 ??
+    T = [R p_prev; 0 0 0 1];
 
     bi = z0;
 
