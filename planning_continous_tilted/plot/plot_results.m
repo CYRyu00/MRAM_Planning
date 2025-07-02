@@ -2,8 +2,8 @@ close all
 num_AMs_arr=[];
 opt_val_arr=[];
 time_arr =[];
-for num_AMs = 1:1:3
-    filename = sprintf('data/Q2_1e0_1110/10sec/%d_1_0.mat', num_AMs);
+for num_AMs = 1:1:6
+    filename = sprintf('data/Q2_1e0_1110/%d_1_0.mat', num_AMs);
     load(filename);
     fprintf("num AMs: %d, J*: %f, processing time: %f\n", num_AMs, optimal_value, processing_time)
    
@@ -13,7 +13,7 @@ for num_AMs = 1:1:3
     
     %disp(rho_opt)
     do_view=1; g=[0;0;-9.81];q=[0;0;0;0];
-    [AM_com, AM_mass, AM_inertia]  = get_inertia_double(rho_opt,K,L, core ,m0, I0, d);
+    [AM_com, AM_mass, AM_inertia]  = get_inertia_duo_double(rho_opt,K,L, core ,m0, I0, d);
     mass =  {10, 1, 0.5, AM_mass};
     inertia = {eye(3)*1, eye(3)*0.1, eye(3)*0.1, AM_inertia, zeros(3,3)};
     r_i_ci = {[0.5;-0.02;0.05],[-0.05;0;0.08],[0;0;-0.05],[AM_com(1);0;AM_com(2)], zeros(3,1)};

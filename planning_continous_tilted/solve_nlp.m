@@ -21,7 +21,7 @@ inertia{4} = AM_inertia;
 r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];
 
 tau = [(- c_1 * x(5)); (- c_2 * x(6) - kt * x(2) + mass{2} * handle_factor); 0; 0] ;
-F_ext = map_u2wrench(u, rho, K, L, core, mu, r, d, theta);
+F_ext = map_u2wrench_duo(u, rho, K, L, core, mu, r, d, theta);
 
 qdd = FD(n, dh, mass, inertia, r_i_ci, gravity, x(1:4), x(5:8), tau, F_ext);
 

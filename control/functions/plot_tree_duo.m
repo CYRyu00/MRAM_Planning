@@ -1,4 +1,4 @@
-function plot_tree(robot, dh, params, theta, x_opt, u_opt, dt, N, slow_factor, force_scale, rho, core, K, L)
+function plot_tree_duo(robot, dh, params, theta, x_opt, u_opt, dt, N, slow_factor, force_scale, shape, dN)
 x=x_opt;
 u=u_opt;
 
@@ -13,14 +13,13 @@ framesPerSecond = 1/dt*slow_factor;
 rate = rateControl(framesPerSecond);
 
 
-
 m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};
 
 ax.View =[150,25];
 axis([-0.5 1.5 -0.5 1.5 0 2])
 
 
-for i = 1:N
+for i = 1:dN:N
     
     show(robot,x(i,1:4)','PreservePlot',false);
     drawnow
@@ -42,7 +41,7 @@ for i = 1:N
         p_05 = T_05(1:3, 4);
         R_05 = T_05(1:3, 1:3);
         
-        wrench = map_u2wrench_duo_double(u(i,:)', rho, K, L, core, mu, r, d, theta);
+        wrench =  map_u2wrench_duo_double(u(i,:)', shape, mu, r, d, theta);
 
         % Force
         f_w = R_05 *wrench(4:6);   

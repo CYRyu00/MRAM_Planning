@@ -45,7 +45,7 @@ for i = 1:N
         p_05 = T_05(1:3, 4);
         R_05 = T_05(1:3, 1:3);
         
-        wrench = map_u2wrench_double(u(i,:)', rho, K, L, core, mu, r, d, theta);
+        wrench = map_u2wrench_duo_double(u(i,:)', rho, K, L, core, mu, r, d, theta);
 
         % Force
         f_w = R_05 *wrench(4:6);   

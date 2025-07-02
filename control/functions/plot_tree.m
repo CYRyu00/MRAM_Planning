@@ -1,4 +1,4 @@
-function plot_tree(robot,dh, params, x_opt,u_opt, dt,N, slow_factor, force_scale, shape)
+function plot_tree(robot, dh, params, x_opt, u_opt, dt, N, slow_factor, force_scale, shape, dN)
 x=x_opt;
 u=u_opt;
 
@@ -9,11 +9,8 @@ show(robot,x(1,1:4)');
 view(2)
 ax = gca;
 hold on
-dN = 10;
 framesPerSecond = 1/dt*slow_factor/dN;
 rate = rateControl(framesPerSecond);
-
-
 
 m0 = params{1}; I0 = params{2};mu = params{3}; r= params{4}; d= params{5}; thrust_limit= params{6};
 

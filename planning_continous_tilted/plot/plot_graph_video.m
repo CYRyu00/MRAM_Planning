@@ -25,10 +25,8 @@ title("states")
 axis tight
 
 subplot(4,1,2)
-plot(time(1:end-1), u_opt(:,1:2),'LineWidth', 1.5)
-legend({'$u_1$','$u_2$'}, ...
-       'Interpreter','latex','FontSize',12);
-title("motor inputs")
+plot(time(1:end-1), u_opt,'LineWidth', 1.5)
+title("thrusts")
 axis tight;
 
 [AM_com, AM_mass, AM_inertia]  = get_inertia_duo_double(rho_opt,K,L, core ,m0, I0, d);
@@ -39,7 +37,7 @@ r_i_ci{4} = [AM_com(1); r_i_ci{4}(2); AM_com(2)];
 wrench = zeros(N,6);
 tau = zeros(N,n);
 for i=1:N
-    wrench(i,:) = map_u2wrench_double(u_opt(i,:)', rho_opt, K, L, core, mu, r, d, theta);
+    wrench(i,:) = map_u2wrench_duo_double(u_opt(i,:)', rho_opt, K, L, core, mu, r, d, theta);
     q = x_opt(i,1:4)'; qd = x_opt(i,5:8)'; qdd = (x_opt(i+1,5:8) -x_opt(i+1,5:8) )'/dt; 
     F_ext = wrench(i,:)';
     tau(i,:) =  [-c_1*qd(1);(-c_2*qd(2) -kt*q(2) + mass{2}*handle_factor); 0; 0] + ...

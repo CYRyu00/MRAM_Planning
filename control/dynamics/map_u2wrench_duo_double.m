@@ -1,5 +1,7 @@
-function wrench = map_u2wrench_double(u, rho, k, l, core, mu, r, d, theta)
+function wrench = map_u2wrench_duo_double(u, shape, mu, r, d, theta)
     wrench = zeros(6,1);
+    [core_row, core_col] = find(shape == 2);
+    [AMs_rows, AMs_cols] = find(shape ~= 0);
     
     s = sin(theta); c = cos(theta);
     A_theta = [mu*s/sqrt(2) - r*c, mu*s/sqrt(2) - r*c, - mu*s/sqrt(2) + r*c, - mu*s/sqrt(2) + r*c;
@@ -13,17 +15,15 @@ function wrench = map_u2wrench_double(u, rho, k, l, core, mu, r, d, theta)
     R1 = eye(3,3); R2 = [0 -1 0;1 0 0; 0 0 1]; % R{3} = eye(3,3);
     
     A_duo = [Ad(R1, p1) * A_theta, Ad(R2, p2) * A_theta];
-    
-    for i=1:k
-        for j=1:l
-            r = [ (core(2) - j) * -2 *d ; (core(1) - i) *d ;0];% p_j,core
-            F_bi = rho(i,j) * A_duo * u( 8*((i-1)*l + j) - 7 : 8*((i-1)*l + j) );% [ moment; force]
-            wrench(1:3) = wrench(1:3) + F_bi(1:3) - cross(r,F_bi(4:6));
-            wrench(4:6) = wrench(4:6) + F_bi(4:6);
-        end
+
+    for i=1:length(AMs_rows)
+        r = [ (core_col - AMs_cols(i)) * -2 *d ; (core_row - AMs_rows(i)) *d ;0];% p_j,core
+        
+        F_bi = A_duo * u(8*i -7 : 8*i);% [moment; force]
+        wrench(1:3) = wrench(1:3) + F_bi(1:3) - cross(r,F_bi(4:6));
+        wrench(4:6) = wrench(4:6) + F_bi(4:6);
     end
 end
-
 function out = Ad(R, p)
 out = [R zeros(3,3); S(p)*R R];
 end
@@ -32,3 +32,4 @@ out = [0 -p(3) p(2);
        p(3) 0 -p(2);
        -p(2) p(1) 0];
 end
+

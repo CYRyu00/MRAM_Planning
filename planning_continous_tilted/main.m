@@ -32,15 +32,15 @@ max_iter = 2000;
 eps = 0.25;
 gamma = 0.3;
 
-for num_AMs = 2:1:3
+for num_AMs = 1:1:3
     for CASE = -1
         if CASE == 1 && num_AMs > 10
             continue
         end
         if CASE == -1
             K = 2 * num_AMs - 1; L = num_AMs; core = [num_AMs, 1];
-            if num_AMs > 5
-                K = 9; L = 5; core = [5, 1];
+            if num_AMs > 4
+                K = 7; L = 4; core = [4, 1];
             end
             mkdir data/Q2_1e0_1110
             filename = sprintf('data/Q2_1e0_1110/%d_%d_%d.mat', num_AMs, thrust_scale, tau_scale);
