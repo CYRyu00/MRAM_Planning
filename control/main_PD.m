@@ -18,7 +18,7 @@ K_d = diag([kd_pos kd_pos kd_pos kd_yaw]);
 
 X_hover = [1; 2; 3] * 1e-2; yaw_hover = 1 / 180 *pi; 
 dt_sim = 0.001;
-N_sim = 200;
+N_sim = 300;
 %%
 theta = 15 / 180 * pi;
 s = sin(theta); c = cos(theta);
@@ -56,7 +56,7 @@ for i = 1:N_sim
     v = V(4:6);
     G = [I0, zeros(3, 3); zeros(3, 3), m0 * eye(3, 3)];
     C = [S(w) S(v); zeros(3,3) S(w)];
-    g = [ zeros(3,1); R' * m0 * gravity];
+    g = [ zeros(3,1); R' * m0 * -gravity];
 
     % Passive decomposition
     A = [zeros(3,3), R; e_3' * R, zeros(1,3)];
@@ -73,7 +73,7 @@ for i = 1:N_sim
     v_E = omega_bot * V;
     
     G_L = delta_top' * G * delta_top;
-    G_E = delta_ bot' * G * delta_bot;
+    G_E = delta_bot' * G * delta_bot;
 
     Ad =  [zeros(3,3), Rd; e_3' * Rd, zeros(1,3)];
     delta_topd = [Rd' * e_1, Rd' * e_2; zeros(3,2)];

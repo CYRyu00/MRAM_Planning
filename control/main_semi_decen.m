@@ -6,20 +6,22 @@ m_duo = 2 * m0;
 D = [0.5 * d; 0; 0];
 I_duo = 2 * I0 + 2 * m0 * (D' * D * eye(3,3) - D * D');
 %% CONTROL GAIN
-wn = 2.0; damp = 1.2; % 3 / 1.2
+wn = 3.0; damp = 1.5; % 2 / 1.5
 k_p_x = m_duo * wn^2;
 k_d_x = 2 * damp * sqrt(m_duo * k_p_x);  
 
-wn = 2.0; damp = 1.2; % 3 / 1.2
+wn = 3.0; damp = 1.5; % 2 / 1.5
 k_p_z = m_duo * wn^2;
 k_d_z = 2 * damp * sqrt(m_duo * k_p_z);  
 
 k_p = diag([k_p_x, k_p_x, k_p_z]);
 k_d = diag([k_d_x, k_d_x, k_d_z]);
 
-wn = 1.0; damp = 1.2; % 1 / 1.2
+wn = 1.2; damp = 0.9; % 1.2 / 0.9
 k_R = m_duo * wn^2;
 k_w = 2 * damp * sqrt(m_duo * k_R);  
+scale = 0.5; gamma = 0.1;
+k_I = k_w *scale;
 
 do_video = true;
 save_video = false;
@@ -91,11 +93,17 @@ end
 
 e_R = cell(num_AMs, 1);
 e_w = cell(num_AMs, 1);
+e_I = cell(num_AMs, 1);
 e_p = cell(num_AMs, 1);
 e_d = cell(num_AMs, 1);
 
+for j = 1:num_AMs
+    e_I{j} = 0;
+end
+
 e_R_hist  = [];
 e_w_hist  = [];
+e_I_hist  = [];
 e_p_hist  = [];
 e_d_hist = [];
 times = [];
@@ -107,7 +115,6 @@ for i = 1:N_sim_tmp %N_sim
     disturb = min(max(disturb, - max_val), max_val);
     disturb_sim(i,:) = disturb;
     
-    %TODO : check get T w v function 
     % get simulated states
     [T_0i, w_cell, v_cell] = get_T_w_v(x_sim(i, 1:n)', x_sim(i, n+1:end)', dh, n);
     R_45 = [1 0 0; 0 0 -1;0 1 0];
@@ -142,11 +149,12 @@ for i = 1:N_sim_tmp %N_sim
 
         e_R{j} = 0.5 * vee(R_des' * R - R' * R_des);
         e_w{j} = w - R' * R_des * w_des;
+        e_I{j} = e_I{j} + (e_w{j} + gamma * e_R{j}) * dt_sim;
 
         e_p{j} = Y{j} - Y_des{j};
         e_d{j} = Yd{j} - Yd_des{j};
         
-        force_ = R' * ( m_duo * gravity + m_duo * Ydd_des - k_d * e_d{j} - k_p * e_p{j});
+        force_ = R' * ( m_duo * -gravity + m_duo * Ydd_des - k_d * e_d{j} - k_p * e_p{j} - k_I * e_I{j});
         tau_   = S(w) * I_duo * w - k_R * e_R{j} - k_w * e_w{j} ... % TODO e_I for integral
                  - I_duo * (S(w) * R_des * w_des - R_des * wd_des);
         u_fb(8 * j - 7 : 8 * j) = A_dagger * [tau_; force_];
@@ -163,6 +171,7 @@ for i = 1:N_sim_tmp %N_sim
     j = 1; %you could chose 1 ~ num_AMs
     e_R_hist = [e_R_hist, e_R{j}];
     e_w_hist = [e_w_hist, e_w{j}];
+    e_I_hist = [e_I_hist, e_I{j}];
     e_p_hist = [e_p_hist, e_p{j}];
     e_d_hist = [e_d_hist, e_d{j}];
     times = [times, i * dt_sim];
@@ -175,27 +184,33 @@ plot_simulation_results(t_sim, x_sim, x_d_interp, u_sim, u_d_interp, disturb_sim
     n, nx, nu, N_sim, dt_sim, delta_inertia, delta_k, sigma, mean, max_val)
 
 colors = lines(3);
-figure('Position',[600, 50, 800, 700])
+figure('Position',[200, 50, 1200, 700])
 
-subplot(2,2,1)
+subplot(2,3,1)
 plot(times, e_R_hist)
 legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_R$', 'Interpreter','latex','FontSize', 14)
 grid on
 
-subplot(2,2,2)
+subplot(2,3,2)
 plot(times, e_w_hist)
 legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_w$', 'Interpreter','latex','FontSize', 14)
 grid on
 
-subplot(2,2,3)
+subplot(2,3,3)
+plot(times, e_I_hist)
+legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
+title('$e_I$', 'Interpreter','latex','FontSize', 14)
+grid on
+
+subplot(2,3,4)
 plot(times, e_p_hist)
 legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_p$', 'Interpreter','latex','FontSize', 14)
 grid on
 
-subplot(2,2,4)
+subplot(2,3,5)
 plot(times, e_d_hist)
 legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_{d}$', 'Interpreter','latex','FontSize', 14)

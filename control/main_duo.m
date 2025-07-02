@@ -8,31 +8,32 @@ m_duo = 2 * m0;
 D = [0.5 * d; 0; 0];
 I_duo = 2 * I0 + 2 * m0 * (D' * D * eye(3,3) - D * D');
 %%
-wn = 4.0; damp = 1.2; % 3 / 1.2
+wn = 2.0; damp = 2.0; % 2 / 1.5
 k_p_x = m_duo * wn^2;
 k_d_x = 2 * damp * sqrt(m_duo * k_p_x);  
 
-wn = 4.0; damp = 1.2; % 3 / 1.2
+wn = 2.0; damp = 1.5; % 2 / 1.5
 k_p_z = m_duo * wn^2;
 k_d_z = 2 * damp * sqrt(m_duo * k_p_z);  
 
 k_p = diag([k_p_x, k_p_x, k_p_z]);
 k_d = diag([k_d_x, k_d_x, k_d_z]);
 
-wn = 3; damp = 1.2; % 3 / 1.2
+wn = 1.2; damp = 0.9; % 1.2 / 0.9
 k_R = m_duo * wn^2;
 k_w = 2 * damp * sqrt(m_duo * k_R);  
+
 
 uncetainty = 1.00; % mass, inertia
 
 dt_sim = 0.001;
 N_sim = 10000;
 
-X_hover = [1; 2; 3] * 1e0; yaw_hover = 10 / 180 *pi; 
+X_hover = [1; 2; 3] * 1e0; yaw_hover = 100 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
 radius = 0.5;  v_z = 0.1;
 omega     = 2 * pi * 0.1; 
-omega_yaw = 2 * pi * 0.05; 
+omega_yaw = 2 * pi * 0.01; 
 X_hover = [0; 0; 1]; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
 %%
@@ -78,13 +79,13 @@ for i = 1:N_sim
     Xd = R * V(4:6);
     G = [I_duo, zeros(3, 3); zeros(3, 3), m_duo * eye(3, 3)];
     C = [S(w) S(v); zeros(3,3) S(w)];
-    g = [ zeros(3,1); R' * m_duo * gravity];
+    g = [ zeros(3,1); R' * m_duo * -gravity];
 
     % Impedence controller
     e_p = X - X_des(:, i);
     e_d = Xd - Xd_des(:, i);
     
-    force_ = R' * ( m_duo * gravity + m_duo * Xdd_des(:, i) - k_d * e_d - k_p * e_p);
+    force_ = R' * ( -m_duo * gravity + m_duo * Xdd_des(:, i) - k_d * e_d - k_p * e_p);
 
     w_des = [0 ; 0; yawd_des(:, i)];
     wd_des = [0 ; 0; yawdd_des(:, i)];    

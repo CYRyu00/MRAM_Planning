@@ -5,37 +5,32 @@ m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};
 thrust_limit= params{6}; kt = params{7}; c_1 = params{8}; c_2 = params{9}; mass_door = params{10};
 handle_factor = params{11}; inertia = params{12}; r_i_ci = params{13}; n = params{14}; dh = params{15}; gravity = params{16};
 %%
-wn = 4.0; damp = 1.2; % 4 / 1.2
+wn = 1.0; damp = 1.2; % 1 / 1.2
 k_p_x = m0 * wn^2;
 k_d_x = 2 * damp * sqrt(m0 * k_p_x);  
 
-wn = 3.0; damp = 1.2; % 3 / 1.2
+wn = 2.0; damp = 1.2; % 2 / 1.2
 k_p_z = m0 * wn^2;
 k_d_z = 2 * damp * sqrt(m0 * k_p_z);  
 
 k_p = diag([k_p_x, k_p_x, k_p_z ]);
 k_d = diag([k_d_x, k_d_x, k_d_z ]);
 
-wn = 5; damp = 1.2; % 5 / 1.2
+wn = 10; damp = 1.2; % 5 / 1.2
 k_R = m0 * wn^2;
 k_w = 2 * damp * sqrt(m0 * k_p);  
 
-uncetainty = 1.10; % mass, inertia
-
-%I0 = diag([I0(1,1) I0(2,2) I0(3,3)]);
-%m0 = 4.34; I0 = diag([0.082, 0.0845, 0.1377]);
-%k_p = 16 * m0; k_d = 5.6 * m0;
-%k_R = 8.81/3; k_w = 2.54/10; % 8.81/10, 2.54/10
+uncetainty = 1.00; % mass, inertia
 
 dt_sim = 0.001;
-N_sim = 20000;
+N_sim = 15000;
 
-X_hover = [1; 2; 3] * 1e0; yaw_hover = 100 / 180 *pi; 
+X_hover = [1; 2; 3] * 1e-1; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
-radius = 0.3;  v_z = 0.1;
+radius = 0.3;  v_z = 0.00;
 omega     = 2 * pi * 0.1; 
-omega_yaw = 2 * pi * 0.05; % omega_yaw should be small
-X_hover = [0; 0; 1]; yaw_hover = 0 / 180 *pi; 
+omega_yaw = 2 * pi * 0.0; % omega_yaw should be small
+X_hover = [0; 0; 0.5]; yaw_hover = 10 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
 %%
 theta = 15 / 180 * pi;
@@ -67,7 +62,6 @@ omega_top = inv(delta_top' * I0 * delta_top) * delta_top' * I0;
 
 delta = [delta_top delta_bot];
 omega = [omega_top; omega_bot];
-omega * delta
 
 % Define numerical J
 J_num = I0 / norm(I0);
@@ -112,7 +106,7 @@ for i = 1:N_sim
     Xd = R * V(4:6);
     G = [I0, zeros(3, 3); zeros(3, 3), m0 * eye(3, 3)];
     C = [S(w) S(v); zeros(3,3) S(w)];
-    g = [ zeros(3,1); R' * m0 * gravity];
+    g = [ zeros(3,1); R' * -m0 * gravity];
 
     % Geometric controller
     e_p = X - X_des(:, i);
@@ -127,8 +121,8 @@ for i = 1:N_sim
 
     % for the case of e_f = e_3
     b1_des = [cos(yaw_des(i)); sin(yaw_des(i)) ; 0];
-    f_des = - k_p * e_p - k_d * e_d + m0 * gravity + m0 * Xdd_des(:, i);
-    b3_des = -f_des / norm(f_des);
+    f_des = - m0 * gravity + m0 * Xdd_des(:, i) - k_p * e_p - k_d * e_d;
+    b3_des = f_des / norm(f_des);
     b2_des = S(b3_des) * b1_des / norm(S(b3_des) * b1_des);
     R_des = [S(b2_des)*b3_des, b2_des, b3_des];
 
@@ -139,7 +133,7 @@ for i = 1:N_sim
 
     lambda_tau = B_tau_dagger * tau_des;
     
-    u_4 = (f_des' * R * e_f) / ((B_force * lambda_f_unit)' * R * e_f);
+    u_4 = (f_des' * R * e_f) / ((B_force * lambda_f_unit)' * e_f);
     lambda_force = u_4 * lambda_f_unit;
 
     lambda = lambda_tau + lambda_force;

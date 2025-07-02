@@ -3,14 +3,14 @@ clear;
 load("../planning_continous/data/Q2_1e0_1110/10sec/6_1_0.mat")
 close all;
 %% CONTROL GAIN
-alpha = 1e-2; beta = 1e-4; % 1e-2 / 1e-4
-b = 2e-1; k = 3e-1; % 2e-1/ 3e -1
+alpha = 3e-2; beta = 1e-4; % 1e-2 / 1e-4
+b = 1e-2; k = 2e-1; % 1e-2/ 2e -1
 
-alpha = 7e-2; beta = 1e-5;     %5e-2 / 1e-4
+%alpha = 5e-1; beta = 5e-5;     %5e-2 / 1e-4
 
-w_n = 2 * pi * 0.02; damp = 1.0; % 0.6 pi/ 2.0
-b = 2* m0 * damp * w_n;
-k = m0 * w_n^2; 
+%w_n = 2 * pi * 0.01; damp = 1.0; % 0.6 pi/ 2.0
+%b = 2* m0 * damp * w_n;
+%k = m0 * w_n^2; 
 
 do_video = true;
 save_video = false;
