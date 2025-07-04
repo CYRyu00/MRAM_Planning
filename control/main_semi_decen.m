@@ -1,16 +1,16 @@
 addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "casadi_functions", "functions", "../params" )
 clear; close all;
-load("../planning_continous_tilted/data/Q2_1e0_1110/2_1_0.mat")
+load("../planning_continous_tilted/data/Q2_1e0_1110/20sec/3_1_0.mat")
 
 m_duo = 2 * m0;
 D = [0.5 * d; 0; 0];
 I_duo = 2 * I0 + 2 * m0 * (D' * D * eye(3,3) - D * D');
 %% CONTROL GAIN
-wn = 3.0; damp = 1.5; % 2 / 1.5
+wn = 4.0; damp = 1.2; % 4 / 1.2
 k_p_x = m_duo * wn^2;
 k_d_x = 2 * damp * sqrt(m_duo * k_p_x);  
 
-wn = 3.0; damp = 1.5; % 2 / 1.5
+wn = 2.0; damp = 1.2; % 2 / 1.2
 k_p_z = m_duo * wn^2;
 k_d_z = 2 * damp * sqrt(m_duo * k_p_z);  
 
@@ -20,13 +20,17 @@ k_d = diag([k_d_x, k_d_x, k_d_z]);
 wn = 1.2; damp = 0.9; % 1.2 / 0.9
 k_R = m_duo * wn^2;
 k_w = 2 * damp * sqrt(m_duo * k_R);  
-scale = 0.5; gamma = 0.1;
+scale = 5.0; gamma = 0.1; % 5.0 / 0.1
 k_I = k_w *scale;
 
+K_o_r = [norm(I_duo), norm(I_duo), norm(I_duo)];
+K_o_p = [m_duo, m_duo, m_duo] *1e1; %1e1
+K_o = diag([K_o_r, K_o_p]) * 0e-1; %0
+
 do_video = true;
-save_video = false;
-N_sim_tmp = 1000;
-dN = 10;
+save_video = true;
+N_sim_tmp = 2000;
+dN = 40;
 %% Parsing and Interpolation 
 shape = zeros([K, L]);
 x_d = x_opt; u_d = zeros([N, 8 * num_AMs]);
@@ -53,13 +57,12 @@ do_plot = 0;
 %% Simulation
 delta_inertia = 1.0; delta_k = 1.0;
 sigma = 0.0; mean = 0.00; max_val = 0.0;
-
-x_sim = zeros(N_sim + 1, nx); x_sim(1,:) = x_d_interp(1,:);
-u_sim = zeros(N_sim, nu);
-
 disturb_sim = zeros(N_sim, n);
 disturb = mean * [1; 1; 1; 1];
 rng('shuffle')
+
+x_sim = zeros(N_sim + 1, nx); x_sim(1,:) = x_d_interp(1,:);
+u_sim = zeros(N_sim, nu);
 
 [core_row, core_col] = find(shape == 2);
 [AMs_rows, AMs_cols] = find(shape ~= 0);
@@ -96,9 +99,15 @@ e_w = cell(num_AMs, 1);
 e_I = cell(num_AMs, 1);
 e_p = cell(num_AMs, 1);
 e_d = cell(num_AMs, 1);
+F_prev = cell(num_AMs, 1);
+F_hat = cell(num_AMs, 1);
+integral = cell(num_AMs, 1);
 
 for j = 1:num_AMs
     e_I{j} = 0;
+    F_prev{j} = zeros(6,1);
+    F_hat{j} = zeros(6,1);
+    integral{j} = zeros(6,1);
 end
 
 e_R_hist  = [];
@@ -106,6 +115,7 @@ e_w_hist  = [];
 e_I_hist  = [];
 e_p_hist  = [];
 e_d_hist = [];
+F_hat_hist = [];
 times = [];
 
 for i = 1:N_sim_tmp %N_sim
@@ -155,8 +165,26 @@ for i = 1:N_sim_tmp %N_sim
         e_d{j} = Yd{j} - Yd_des{j};
         
         force_ = R' * ( m_duo * -gravity + m_duo * Ydd_des - k_d * e_d{j} - k_p * e_p{j} - k_I * e_I{j});
-        tau_   = S(w) * I_duo * w - k_R * e_R{j} - k_w * e_w{j} ... % TODO e_I for integral
+        tau_   = S(w) * I_duo * w - k_R * e_R{j} - k_w * e_w{j}  - k_w * e_I{j} ... % TODO e_I for integral
                  - I_duo * (S(w) * R_des * w_des - R_des * wd_des);
+        
+        %MBO
+        G = [I_duo, zeros(3, 3); zeros(3, 3), m_duo * eye(3, 3)];
+        v = R' * Yd{j};
+        C = [S(w) S(v); zeros(3,3) S(w)];
+        g = [ zeros(3,1); R' * m_duo * -gravity];
+        V = [w ; v];
+        p = G * V;
+        if i == 1
+            p_0 = p; 
+        end
+        integral{j} = integral{j} + (F_prev{j} + F_hat{j} + C' * V - g) * dt_sim;
+        F_hat{j} = K_o * (p - p_0 - integral{j});
+
+        tau_ = tau_ - F_hat{j}(1:3);
+        force_ = force_ - F_hat{j}(4:6);
+        F_prev{j} = [tau_; force_];
+
         u_fb(8 * j - 7 : 8 * j) = A_dagger * [tau_; force_];
     end
     %u_fb = u_d_interp(i, :);
@@ -174,6 +202,7 @@ for i = 1:N_sim_tmp %N_sim
     e_I_hist = [e_I_hist, e_I{j}];
     e_p_hist = [e_p_hist, e_p{j}];
     e_d_hist = [e_d_hist, e_d{j}];
+    F_hat_hist = [F_hat_hist, F_hat{j}];
     times = [times, i * dt_sim];
 end
 
@@ -216,6 +245,14 @@ legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_{d}$', 'Interpreter','latex','FontSize', 14)
 grid on
 
+subplot(2,3,6)
+plot(times, F_hat_hist)
+legend({'$\tau_x$', '$\tau_y$', '$\tau_z$', ...
+        '$f_x$', '$f_y$', '$f_z$'}, ...
+        'Interpreter','latex','FontSize', 12);
+title('$\hat{F}$', 'Interpreter','latex','FontSize', 14)
+grid on
+
 if do_video
     [AM_com, AM_mass, AM_inertia] = get_inertia_duo(shape, m0, I0, d);
     mass = {mass_door(1), mass_door(2), mass_door(3), AM_mass};
@@ -226,7 +263,7 @@ if do_video
     robot = generate_door_duo(n, dh, r_i_ci, d, gravity, shape, mass, inertia, do_view, q);
     
     if save_video
-        save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+        save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape, dN)
     else
         plot_tree_duo(robot, dh, params, theta, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape, dN)
     end

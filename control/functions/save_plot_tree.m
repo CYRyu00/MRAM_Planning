@@ -1,4 +1,4 @@
-function save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape)
+function save_plot_tree(robot,dh, params, x_opt,u_opt, dt,N,slow_factor, force_scale, shape, dN)
 x=x_opt;
 u=u_opt;
 
@@ -9,7 +9,6 @@ show(robot,x(1,1:4)');
 view(2)
 ax = gca;
 hold on
-dN = 10;
 framesPerSecond = 1/dt*slow_factor/dN;
 rate = rateControl(framesPerSecond);
 

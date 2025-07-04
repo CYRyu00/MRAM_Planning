@@ -9,7 +9,7 @@ wn = 1.0; damp = 1.2; % 1 / 1.2
 k_p_x = m0 * wn^2;
 k_d_x = 2 * damp * sqrt(m0 * k_p_x);  
 
-wn = 2.0; damp = 1.2; % 2 / 1.2
+wn = 3.0; damp = 1.2; % 2 / 1.2
 k_p_z = m0 * wn^2;
 k_d_z = 2 * damp * sqrt(m0 * k_p_z);  
 
@@ -27,10 +27,10 @@ N_sim = 15000;
 
 X_hover = [1; 2; 3] * 1e-1; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
-radius = 0.3;  v_z = 0.00;
+radius = 0.3;  v_z = 0.05;
 omega     = 2 * pi * 0.1; 
-omega_yaw = 2 * pi * 0.0; % omega_yaw should be small
-X_hover = [0; 0; 0.5]; yaw_hover = 10 / 180 *pi; 
+omega_yaw = 2 * pi * 0.01; % omega_yaw should be small
+X_hover = [0; 0; 0.1]; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
 %%
 theta = 15 / 180 * pi;

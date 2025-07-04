@@ -13,7 +13,7 @@ b = 1e-2; k = 2e-1; % 1e-2/ 2e -1
 %k = m0 * w_n^2; 
 
 do_video = true;
-save_video = false;
+save_video = true;
 dN = 10;
 %% Parsing and Interpolation 
 shape = zeros([K,L]);
@@ -211,7 +211,7 @@ if do_video
     robot = generate_door_ver2(n, dh, r_i_ci, d, gravity, shape, mass, inertia, do_view, q);
     
     if save_video
-        save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape)
+        save_plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape, dN)
     else
         plot_tree(robot, dh, params, x_sim, u_sim, dt_sim, N_sim, slow_factor, force_scale, shape, dN)
     end
