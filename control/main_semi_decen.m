@@ -29,8 +29,16 @@ K_o = diag([K_o_r, K_o_p]) * 0e-1; %0
 
 do_video = true;
 save_video = true;
+
+dt_sim = 0.01;
+N_sim = N * dt / dt_sim;
 N_sim_tmp = 2000;
-dN = 40;
+dN = 20;
+
+delta_inertia = 1.1; delta_k = 1.0;
+sigma = 0.1; mean = 0.00; max_val = 0.10;
+disturb_sim = zeros(N_sim, n);
+disturb = mean * [1; 1; 1; 1];
 %% Parsing and Interpolation 
 shape = zeros([K, L]);
 x_d = x_opt; u_d = zeros([N, 8 * num_AMs]);
@@ -47,18 +55,12 @@ disp(shape)
 params = define_params();
 x_dot_func = define_dynamics_duo(shape, num_AMs, params, theta);
 
-dt_sim = 0.01;
-N_sim = N * dt / dt_sim;
 t_plan = linspace(0, dt * N, N + 1);
 t_sim = linspace(0, dt_sim * N_sim, N_sim + 1);
 
 do_plot = 0;
 [x_d_interp, u_d_interp] = interpolate_traj(x_d, u_d, t_plan, t_sim, do_plot);
 %% Simulation
-delta_inertia = 1.0; delta_k = 1.0;
-sigma = 0.0; mean = 0.00; max_val = 0.0;
-disturb_sim = zeros(N_sim, n);
-disturb = mean * [1; 1; 1; 1];
 rng('shuffle')
 
 x_sim = zeros(N_sim + 1, nx); x_sim(1,:) = x_d_interp(1,:);
@@ -245,13 +247,13 @@ legend({'$x$', '$y$', '$z$'}, 'Interpreter','latex', 'FontSize',10)
 title('$e_{d}$', 'Interpreter','latex','FontSize', 14)
 grid on
 
-subplot(2,3,6)
-plot(times, F_hat_hist)
-legend({'$\tau_x$', '$\tau_y$', '$\tau_z$', ...
-        '$f_x$', '$f_y$', '$f_z$'}, ...
-        'Interpreter','latex','FontSize', 12);
-title('$\hat{F}$', 'Interpreter','latex','FontSize', 14)
-grid on
+%subplot(2,3,6)
+%plot(times, F_hat_hist)
+%legend({'$\tau_x$', '$\tau_y$', '$\tau_z$', ...
+%        '$f_x$', '$f_y$', '$f_z$'}, ...
+%        'Interpreter','latex','FontSize', 12);
+%title('$\hat{F}$', 'Interpreter','latex','FontSize', 14)
+%grid on
 
 if do_video
     [AM_com, AM_mass, AM_inertia] = get_inertia_duo(shape, m0, I0, d);
