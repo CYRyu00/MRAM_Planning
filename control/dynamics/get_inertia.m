@@ -1,4 +1,4 @@
-function [AM_com, AM_mass, AM_inertia] = get_inertia(shape ,m0, I0, d)
+function [AM_com, AM_mass, AM_inertia] = get_inertia(shape, m0, I0, d)
     [core_row, core_col] = find(shape == 2);
     [AMs_rows, AMs_cols] = find(shape ~= 0);
     
