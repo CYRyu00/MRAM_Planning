@@ -1,4 +1,4 @@
-addpath("../../casadi-3.6.7-windows64-matlab2018b" , "dynamics", "casadi_functions", "functions", "../params" )
+addpath("../../../casadi-3.6.7-windows64-matlab2018b" , "../dynamics", "../casadi_functions", "../functions", "../../params" )
 clear; close all;
 load("../planning_continous_tilted/data/Q2_1e0_1110/20sec/3_1_0.mat")
 

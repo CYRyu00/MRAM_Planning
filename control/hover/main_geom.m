@@ -1,25 +1,9 @@
-addpath("../../casadi-3.6.7-windows64-matlab2018b", "dynamics", "functions", "../params", "casadi_functions" )
+addpath("../dynamics", "../functions", "../../params" )
 clear; close all
 params = define_params();
 m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};
 thrust_limit= params{6}; kt = params{7}; c_1 = params{8}; c_2 = params{9}; mass_door = params{10};
 handle_factor = params{11}; inertia = params{12}; r_i_ci = params{13}; n = params{14}; dh = params{15}; gravity = params{16};
-%% test
-[V_des_func, grad_q_func, hess_q_func] = define_V_des();
-K_x = [1; 1; 1];
-K_r = diag([3; 3; 3]);
-
-X_des = [0; 0; 1];
-R_des = rpy2rot(0, 0, pi/12);
-quat_des = SO3_to_quaternion(R_des);
-v_des = quaternion_log(quat_des);
-q_des = [v_des; X_des];
-
-X = [0; 0; 0.9];
-R = rpy2rot(0, 0, 0);
-quat = SO3_to_quaternion(R);
-v = quaternion_log(quat);
-q = [v; X];
 %%
 wn = 1.0; damp = 1.2; % 1 / 1.2
 k_p_x = m0 * wn^2;

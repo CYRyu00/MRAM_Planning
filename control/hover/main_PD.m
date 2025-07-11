@@ -1,4 +1,4 @@
-addpath("dynamics", "functions", "../params" )
+addpath("../dynamics", "../functions", "../../params" )
 clear; close all
 params = define_params();
 m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};
@@ -16,15 +16,9 @@ kd_yaw = 2 * damp * sqrt(m0 * kp_yaw);
 K_p = diag([kp_pos kp_pos kp_pos kp_yaw]);
 K_d = diag([kd_pos kd_pos kd_pos kd_yaw]);
 
-K_d_EE = diag([1, 1]) * 0e-1;
-K_ke_L = 1/norm(I0) * 1e0; %try larger
-K_ke_E = 1/m0;
-
-
 X_hover = [1; 2; 3] * 1e-2; yaw_hover = 1 / 180 *pi; 
 dt_sim = 0.001;
-N_sim = 3;
-limit = Inf;
+N_sim = 300;
 %%
 theta = 15 / 180 * pi;
 s = sin(theta); c = cos(theta);
@@ -36,8 +30,6 @@ B_theta = [mu*s/sqrt(2) - r*c, mu*s/sqrt(2) - r*c, - mu*s/sqrt(2) + r*c, - mu*s/
          c, c, c, c];
 B_tau = B_theta(1:3, :);
 B_force = B_theta(4:6, :);
-XI = [1 -1 1 -1; 1 1 -1 -1; -1 1 1 -1; 1 1 1 1]';
-B_u = B_theta * XI;
 
 e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
@@ -56,11 +48,6 @@ times = [];
 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
 %[X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(X_hover, yaw_hover, N_sim, dt_sim);
-
-% TODO
-Xd = Xd + [0.01; 0.02; 0.03];
-w = w + [0.01; 0.02; 0.03];
-V = [w; R' * Xd];
 
 for i = 1:N_sim
     %fprintf("\n\ntime step: %d\n", i);
@@ -102,45 +89,8 @@ for i = 1:N_sim
 
     g_L = delta_top' * g;
     g_E = delta_bot' * g;
-        
-    % Decompose v_E, for make C_LE * v_E -> 0
-    % case rank(C_LE) = 0 , 1, 2
-    E_omega_bot = C_LE; % 2x4
-    E_delta_top = null(C_LE); % 4x2
-    E_delta_bot = inv(G_E) * E_omega_bot' * inv(E_omega_bot * inv(G_E) * E_omega_bot');
-    E_omega_top = inv(E_delta_top' * G_E * E_delta_top) * E_delta_top' * G_E;
-    E_delta = [E_delta_top, E_delta_bot];
-
-    E_B_E = E_delta_bot' * B_E;
-    E_v_L = E_omega_top * v_E;
-    E_v_E = E_omega_bot * v_E;
-    E_G_E = E_delta_bot' * G_E * E_delta_bot;
-    %TODO: closed form of E_deltad
-    if i == 1 
-        E_deltad = zeros(4,4);
-    else
-        E_deltad = (E_delta - E_delta_prev)/dt_sim;
-    end
-    E_delta_prev = E_delta;
     
-    E_C_pd = E_delta' * (G_E * E_deltad + C_E * E_delta);
-    E_C_L  = E_C_pd(1:2, 1:2);
-    E_C_LE = E_C_pd(1:2, 3:4);
-    E_C_EL = E_C_pd(3:4, 1:2);
-    E_C_E  = E_C_pd(3:4, 3:4);
-
-    E_g_E = E_delta_bot' * g_E;
-    
-    gen_1 = E_delta_bot' * B_E;
-    nu_1 = E_C_EL * E_v_L + E_C_E * E_v_E + E_g_E - K_d_EE * E_v_E;
-    % TODO: nu_1 is too large
-    
-    % stabilize v_L
-    KE_L = 0.5 * v_L' * G_L * v_L;
-    gen_2 = v_L' * B_L;
-    nu_2 = - K_ke_L * KE_L;
-
-    % Desired traj: TODO
+    % Desired traj
     yaw = atan2(R(2, 1), R(1, 1));
     h = [X; yaw];
     h_des = [X_des(:, i); yaw_des(:, i)];
@@ -151,18 +101,12 @@ for i = 1:N_sim
     Rd_des = R_des * S(w_des);
 
     v_E_des = [Xd_des(:, i); e_3' * R_des * w_des];
-    v_E_des = v_E_des - K_p * (h - h_des); 
+    vd_E_des = [Xdd_des(:, i); e_3' * (Rd_des * w_des + R_des * wd_des)];
     
-    KE_E = 0.5 * v_E' * G_E * v_E;
-    KE_E_des = 0.5 * v_E_des' * G_E * v_E_des;
-    gen_3 = v_E' * B_E;
-    nu_3 = v_E' * g_E - K_ke_E * (KE_E - KE_E_des);
+    B_E_lambda = C_EL * v_L + C_E * v_E + g_E ...
+                 + G_E * vd_E_des - K_p * (h - h_des) - K_d * (v_E - v_E_des);
 
-    gen = [gen_1; gen_2; gen_3];
-    nu = [nu_1; nu_2; nu_3];
-    %rank(gen)
-    lambda = inv(gen) * nu;
-    lambda = max(min(lambda, limit), -limit);
+    lambda = inv(B_E) * B_E_lambda;
 
     % Dynamics
     Vd = inv(G) * (B_theta * lambda - g - C * V);
@@ -187,7 +131,7 @@ for i = 1:N_sim
     R_hist{i} = R;
     thrusts_hist = [thrusts_hist, lambda];
     v_L_hist = [v_L_hist, v_L];
-    v_E_hist = [v_E_hist, [E_v_L; E_v_E]];
+    v_E_hist = [v_E_hist, v_E];
     v_E_des_hist = [v_E_des_hist, v_E_des];
 
     times = [times; i * dt_sim];
@@ -266,7 +210,7 @@ end
 for j = 1:4
     plot(times, v_E_hist(j, :), 'Color', colors(j + 2,:), 'LineWidth', 1.0);
 end
-legend({'$v_{L1}$', '$v_{L2}$', '$v_{E1}^L$', '$v_{E2}^L$', '$v_{E1}^E$', '$v_{E2}^E$'}, ...
+legend({'$v_{L1}$', '$v_{L2}$', '$v_{E1}$', '$v_{E2}$', '$v_{E3}$', '$v_{E4}$'}, ...
         'Interpreter','latex','FontSize', 12);
 title('$v_L, v_E$', 'Interpreter', 'latex','FontSize', 14)
 grid on

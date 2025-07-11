@@ -1,4 +1,4 @@
-addpath("dynamics", "functions", "../params" )
+addpath("../dynamics", "../functions", "../../params" )
 clear; close all
 params = define_params();
 m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};

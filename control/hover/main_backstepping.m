@@ -1,4 +1,4 @@
-addpath("dynamics", "functions", "../params" )
+addpath("../dynamics", "../functions", "../../params" )
 clear; close all
 params = define_params();
 m0 = params{1}; I0 = params{2}; mu = params{3}; r= params{4}; d= params{5};
@@ -18,7 +18,7 @@ K_d = diag([kd_pos kd_pos kd_pos kd_yaw]);
 
 X_hover = [1; 2; 3] * 1e-2; yaw_hover = 1 / 180 *pi; 
 dt_sim = 0.001;
-N_sim = 300;
+N_sim = 200;
 %%
 theta = 15 / 180 * pi;
 s = sin(theta); c = cos(theta);
@@ -33,7 +33,29 @@ B_force = B_theta(4:6, :);
 
 e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
-e_3 = [0; 0; 1];
+e_3 = [0; 0; 1];   
+E_1 = [1; 0; 0; 0; 0; 0];
+E_2 = [0; 1; 0; 0; 0; 0];
+E_3 = [0; 0; 1; 0; 0; 0];
+E_4 = [0; 0; 0; 1; 0; 0];
+E_5 = [0; 0; 0; 0; 1; 0];
+E_6 = [0; 0; 0; 0; 0; 1];
+%% Passive decomposition
+I0 = diag([I0(1,1) I0(2,2) I0(3,3)]);
+G = [I0, zeros(3, 3); zeros(3, 3), m0 * eye(3, 3)];
+
+xi = [1 -1 1 -1; 1 1 -1 -1; -1 1 1 -1; 1 1 1 1]';
+
+omega_bot = [E_1'; E_2'; E_4'; E_5'];
+delta_top = [E_3, E_6];
+delta_bot = inv(G) * omega_bot' * inv(omega_bot * inv(G) * omega_bot');
+omega_top = inv(delta_top' * G * delta_top) * delta_top' * G;
+delta = [delta_top, delta_bot];
+omega = [omega_top; omega_bot];
+
+B_u = B_theta * xi; % wrench = B_u * u, thrust = xi * u
+B_u_L = delta_top' * [B_u(:,1) , B_u(:,4)]; % u1 and u4
+B_u_E = delta_bot' * [B_u(:,2) , B_u(:,3)]; % u2 and u3
 %%
 X = [0 ; 0; 0]; Xd = [0 ; 0; 0];
 w = [0 ; 0; 0]; wd = [0 ; 0; 0];
@@ -56,32 +78,15 @@ for i = 1:N_sim
     v = V(4:6);
     G = [I0, zeros(3, 3); zeros(3, 3), m0 * eye(3, 3)];
     C = [S(w) S(v); zeros(3,3) S(w)];
-    g = [ zeros(3,1); R' * m0 * -gravity];
-
-    % Passive decomposition
-    A = [zeros(3,3), R; e_3' * R, zeros(1,3)];
-    omega_bot = A;
-    delta_top = [R' * e_1, R' * e_2; zeros(3, 2)];
-    delta_bot = inv(G) * omega_bot' * inv(omega_bot * inv(G) * omega_bot');
-    omega_top = inv(delta_top' * G * delta_top) * delta_top' * G;
-    delta = [delta_top, delta_bot];
-    
-    B_L = delta_top' * B_theta;
-    B_E = delta_bot' * B_theta;
-    
+    g = [ zeros(3,1); R' * m0 * gravity];
+    % passive decomposition    
     v_L = omega_top * V;
     v_E = omega_bot * V;
     
     G_L = delta_top' * G * delta_top;
     G_E = delta_bot' * G * delta_bot;
 
-    Ad =  [zeros(3,3), Rd; e_3' * Rd, zeros(1,3)];
-    delta_topd = [Rd' * e_1, Rd' * e_2; zeros(3,2)];
-    delta_botd = inv(G) * Ad' * inv(A * inv(G) * A') ...
-                 - inv(G) * A' * inv(A * inv(G) * A') ...
-                 * (Ad * inv(G) * A' + A * inv(G) * Ad') * inv(A * inv(G) * A');
-    deltad = [delta_topd, delta_botd];
-    C_pd = delta' * (G * deltad + C * delta);
+    C_pd = delta' * C * delta;
     C_L  = C_pd(1:2, 1:2);
     C_LE = C_pd(1:2, 3:6);
     C_EL = C_pd(3:6, 1:2);
@@ -89,14 +94,16 @@ for i = 1:N_sim
 
     g_L = delta_top' * g;
     g_E = delta_bot' * g;
-    
+
     % Desired traj
+    % TODO : compute h_des and v_E_des
     yaw = atan2(R(2, 1), R(1, 1));
     h = [X; yaw];
     h_des = [X_des(:, i); yaw_des(:, i)];
     w_des = [0 ; 0; yawd_des(:, i)];
     wd_des = [0 ; 0; yawdd_des(:, i)];
-    
+
+    % TODO : compute control input u1, u4 / u2 and u3 dot via backstepping
     R_des = rpy2rot(0, 0, yaw_des(:, i));
     Rd_des = R_des * S(w_des);
 
