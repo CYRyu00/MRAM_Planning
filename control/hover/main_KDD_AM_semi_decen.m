@@ -7,12 +7,12 @@ thrust_limit= params{6}; gravity = params{16};
 dt_sim = 0.001;
 N_sim = 15000;
 %% inertia
-shape = [0 1 1; % <- x | y
+shape = [1 1 1; % <- x | y
          0 2 0; %      v
-         1 1 0];
-shape_mass = [0,  m0, m0;
-              0,  m0 * 1.5, m0;
-              m0, m0, 0];
+         0 1 0];
+shape_mass = [m0,  m0, m0;
+              m0,  m0 * 1.5, m0;
+              m0, m0, m0];
 shape_idx = shape;
 [core_row, core_col] = find(shape == 2);
 [AMs_rows, AMs_cols] = find(shape ~= 0);
@@ -59,16 +59,24 @@ gamma = 2 / m0; % 10 / m0
 N_sim_tmp = 10000;
 
 uncetainty = 1.00; % mass, inertia
-sigma = 0.1; mean = 0.10; max_val = 0.3;
+%disturbance
+sigma = 0.05; mean = 0.00; max_val = 0.3;
 disturb_sim = zeros(N_sim, 6);
 disturb = mean * [0; 0; 0; 0; 0; 1];
+% w_estimation error
+X_error = zeros(3, num_AMs);
+w_error = zeros(3, num_AMs);
+sigma_X = 2 / 100; max_X = 0.1; 
+sigma_w = 2 / 100; max_w = 0.1;
+
+
 rng('shuffle')
 
 X_hover = [1; 2; 3] * 1e-1; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
 radius = 0.3;  v_z = 0.05;
 omega     = 2 * pi * 0.1; 
-omega_yaw = 2 * pi * 0.01; 
+omega_yaw = 2 * pi * 0.02; 
 X_hover = [0; 0; 0.5]; yaw_hover = 0 / 180 *pi; 
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
 %%
@@ -89,7 +97,7 @@ force = ones(num_AMs) * m0 * 1.0;
 w_des_prev = zeros(3, num_AMs);
 
 X_hist = []; Xd_hist = []; w_hist = []; wd_hist = []; R_hist = cell(N_sim, 1); 
-w_des_hist = [];wd_des_hist = []; thrusts_hist = []; F_hat_hist = [];
+w_des_hist = []; wd_des_hist = []; thrusts_hist = []; F_hat_hist = [];
 e_p_hist = []; e_d_hist = [];e_w_hist = []; nu_e_hist = [];
 times = [];
 
@@ -101,10 +109,19 @@ for i = 1:N_sim_tmp
     G = [AM_inertia, zeros(3, 3); zeros(3, 3), AM_mass * eye(3, 3)];
     C = [S(w) S(v); zeros(3,3) S(w)];
     g = [ zeros(3,1); R' * AM_mass * -gravity];
-
+    
     % Semi-decentralized control
     tau_tot = zeros(3, 1);
     force_tot = 0;
+    thrusts = [];
+    %estimation error
+    X_error_dot = randn(3, num_AMs) * sigma_X;
+    X_error = X_error + X_error_dot * dt_sim;
+    X_error = min(max(X_error, - max_X), max_X);
+    w_error_dot = randn(3, num_AMs) * sigma_w;
+    w_error = w_error + w_error_dot * dt_sim;
+    w_error = min(max(w_error, - max_w), max_w);
+
     for j = 1:num_AMs
         if true %mod(i, 10) == 1
         % position control - backstepping
@@ -113,8 +130,8 @@ for i = 1:N_sim_tmp
         kv_j = mj * kv_M;
         
         % TODO : estimation error
-        e_p = X - X_des(:, i); % could be computed using X_com = X_j - R' * r_cj
-        e_pd = Xd - Xd_des(:, i);
+        e_p  = (1 - X_error(:, j)).*X - X_des(:, i); % could be computed using X_com = X_j - R' * r_cj
+        e_pd = (1 - X_error(:, j)).*Xd - Xd_des(:, i);
         e_pdd_hat = gravity + force_prev(j) / mj * R * e_3 - Xdd_des(:, i);
         %e_pdd_hat = Xdd - Xdd_des(:, i);
         
@@ -146,11 +163,13 @@ for i = 1:N_sim_tmp
         end
         w_des_prev(:, j) = w_des;
 
-        wj = w; % TODO : estimation error
+        wj = (1 - w_error(:, j)).*w; % TODO : estimation error
         e_w = wj - w_des;
-        tau_j = S(wj) * Ij * wj + Ij * wd_des - kw_j * e_w - S(r_cj{j}) * [0; 0; force_j];
+        %tau_j = S(wj) * Ij * wj + Ij * wd_des - kw_j * e_w - S(r_cj{j}) * [0; 0; force_j];
+        tau_j = S(wj) * Ij * wj + Ij * wd_des - kw_j * e_w; % assumme shape is symetric
         
         lambda_j = inv(B) * [tau_j; force_j];
+        thrusts = [thrusts; lambda_j];
 
         tau_tot = tau_tot + tau_j + S(r_cj{j}) * [0; 0; force_j];
         force_tot = force_tot + force_j;
@@ -166,7 +185,7 @@ for i = 1:N_sim_tmp
     G = G * uncetainty;
     g = g * uncetainty;
     C = C * uncetainty;
-    Vd = inv(G) * ([tau_tot; 0; 0; force_tot] - g - C * V);
+    Vd = inv(G) * ([tau_tot; 0; 0; force_tot] + disturb - g - C * V);
     Rd = R * S(w);
     
     wd = Vd(1:3);
@@ -186,7 +205,12 @@ for i = 1:N_sim_tmp
     wd_hist = [wd_hist, wd];
     wd_des_hist = [wd_des_hist, wd_des]; 
     R_hist{i} = R;
-    thrusts_hist = [thrusts_hist, lambda_j];
+    thrusts_hist = [thrusts_hist, thrusts];
+
+    e_p = X - X_des(:, i); 
+    e_pd = Xd - Xd_des(:, i);
+    e_w = w - w_des;
+   
     e_p_hist = [e_p_hist, e_p]; 
     e_d_hist = [e_d_hist, e_pd]; 
     e_w_hist = [e_w_hist, e_w];
@@ -235,7 +259,7 @@ legend({'$\omega_x$', '$\omega_x^{\mathrm{des}}$', ...
         '$\omega_z$', '$\omega_z^{\mathrm{des}}$'}, ...
        'Interpreter', 'latex','FontSize', 12);
 title('${\omega}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
-ylim([-5, 5])
+ylim([-1, 1])
 grid on
 
 % 4. wd plot
@@ -250,7 +274,7 @@ legend({'$\dot{\omega}_x$', '$\dot{\omega}_x^{\mathrm{des}}$', ...
         '$\dot{\omega}_z$', '$\dot{\omega}_z^{\mathrm{des}}$'}, ...
         'Interpreter','latex','FontSize', 12);
 title('$\dot{{\omega}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
-ylim([-100, 100])
+ylim([-1, 1])
 grid on
 
 % 7. thrusts
@@ -293,7 +317,7 @@ for j = 1:3
 end
 legend({'$x$','$y$','$z$'},'Interpreter','latex','FontSize', 12);
 title('$e_w$', 'Interpreter', 'latex','FontSize', 14)
-ylim([-10, 10])
+ylim([-1, 1])
 grid on
 
 %nu_e
