@@ -8,7 +8,7 @@ N_sim = 20000;
 %% inertia
 shape = [1 1 1; % <- x | y
          0 2 0; %      v
-         1 1 0];
+         0 1 0];
 shape_mass = [m0,  m0, m0;
               m0,  m0 * 1.5, m0;
               m0,  m0, m0];
@@ -53,8 +53,8 @@ kv_M = diag([kv_M, kv_M, kv_z]);
 kw_I = 10; %10
 
 %regulizer
-k_lambda = 0.0 / norm(gravity);
-k_delta = 1 / norm(gravity);
+k_lambda = 1.0;
+k_delta = 1.0;
 
 epsilon = kv_M(1, 1) * 0.3;
 alpha = 30 / m0; % 30 / m0
@@ -63,18 +63,20 @@ beta = diag([1 1 5]) * m0 * norm(gravity) * 3; % 1 1 5 * m0 * norm(gravity) * 3
 N_sim_tmp = 10000;
 
 mass_uncertainty = 1.10; 
-inertia_uncertainty = 1.10;
+inertia_uncertainty = 0.90;
 thrust_limit = thrust_limit * 3;
 
 %disturbance
-sigma = 0.000; mean = 5.0; max_val = 30.0;
+sigma = 0.0; mean = 5.0; max_val = 30.0;
 disturb_sim = zeros(N_sim, 6);
 disturb = mean * [0; 0; 0; 0.5; -0.7; -1.0];
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 0 / 100; max_X = 0.1; % delicate
-sigma_w = 2 / 100; max_w = 0.1; 
+sigma_X = 5 / 100; max_X = 0.1; % delicate
+sigma_w = 5 / 100; max_w = 0.1; 
+delay = 10; % position control delay dt_sim * delay
+delay_regul = 100; % lambda/delta regularizer delay dt_sim * delay
 
 rng('shuffle')
 
@@ -98,13 +100,14 @@ R = eye(3, 3);
 Rd = R * S(w);
 V = [w; R' * Xd];
 
-force_prev = ones(num_AMs) * m0 * 0.7;
+force_prev = mass_ams * norm(gravity) * 1.0;
 delta_hat = zeros(3, num_AMs);
 w_des_prev = zeros(3, num_AMs);
 
 X_hist = []; Xd_hist = []; w_hist = []; wd_hist = []; R_hist = cell(N_sim, 1); 
 w_des_hist = []; wd_des_hist = []; thrusts_hist = []; F_hat_hist = [];
 e_p_hist = []; e_d_hist = [];e_w_hist = []; nu_e_hist = []; delta_hat_hist = []; delta_tilde_hist = [];
+force_per_M_hist = []; delta_hat_x_per_M_hist = [];
 times = [];
 
 for i = 1:N_sim_tmp
@@ -120,6 +123,8 @@ for i = 1:N_sim_tmp
     tau_tot = zeros(3, 1);
     force_tot = 0;
     thrusts = [];
+    force_per_M = [];
+    delta_hat_x_per_M = [];
     %estimation error
     X_error_dot = randn(3, num_AMs) * sigma_X;
     X_error = X_error + X_error_dot * dt_sim;
@@ -129,14 +134,15 @@ for i = 1:N_sim_tmp
     w_error = min(max(w_error, - max_w), max_w);
 
     for j = 1:num_AMs
-        
         % position control - backstepping
         mj = mass_ams(j);
         kp_j = mj * kp_M;
         kv_j = mj * kv_M;
         
+        if mod(i, delay) == 1
         e_p  = (1 - X_error(:, j)).*X - X_des(:, i); % could be computed using X_com = X_j - R' * r_cj
         e_pd = (1 - X_error(:, j)).*Xd - Xd_des(:, i);
+        end
         e_pdd_hat = gravity + force_prev(j) / mj * R * e_3 - Xdd_des(:, i);
         %e_pdd_hat = Xdd - Xdd_des(:, i);
         
@@ -145,8 +151,9 @@ for i = 1:N_sim_tmp
         end
         
         %regulizer : not stable
-        if i > 1
-            force_prev(j) = force_prev(j) + k_lambda * (mj / AM_mass * force_tot - force_prev(j));
+        if mod(i, delay_regul) == 1 && i > 1            
+            delta_hat(:, j) = delta_hat(:, j) - k_delta * (delta_hat(:, j) - mj / AM_mass * delta_hat_sum);
+            force_prev(j) = force_prev(j) - k_lambda * (force_prev(j) - mj / AM_mass * force_sum);
         end
 
         nu_ej = force_prev(j) * R *e_3 /mj - Xdd_des(:, i) + kv_j * e_pd / mj ...
@@ -164,11 +171,10 @@ for i = 1:N_sim_tmp
         % adaptive control
         delta_hatd = mj / AM_mass * beta * (e_pd + epsilon * e_p + kv_j / mj / gamma * nu_ej); 
         delta_hat(:, j) = delta_hat(:, j) + delta_hatd * dt_sim;
-
+        
         % rotaion control
         Ij = I_cj{j};
         kw_j = kw_I * norm(Ij);
-        
         
         w_des = [w_xj_des; w_yj_des; yawd_des(i)]; 
         if i > 1
@@ -184,15 +190,20 @@ for i = 1:N_sim_tmp
         
         lambda_j = inv(B) * [tau_j; force_j];
         lambda_j = min(thrust_limit, max(-thrust_limit, lambda_j));
-        thrusts = [thrusts; lambda_j];
+        
 
         tau_j = B(1:3,:) * lambda_j;
         force_j = B(4, :) * lambda_j;
         
-        
         tau_tot = tau_tot + tau_j + S(r_cj{j}) * [0; 0; force_j];
         force_tot = force_tot + force_j;
+
+        thrusts = [thrusts; lambda_j];
+        force_per_M = [force_per_M; force_j / mj];
+        delta_hat_x_per_M = [delta_hat_x_per_M; delta_hat(1, j) / mj];
     end
+    delta_hat_sum = sum(delta_hat, 2);
+    force_sum = force_tot;
 
     % generate disturbance
     disturb_dot = randn(6, 1) * sigma;
@@ -224,6 +235,8 @@ for i = 1:N_sim_tmp
     wd_des_hist = [wd_des_hist, wd_des]; 
     R_hist{i} = R;
     thrusts_hist = [thrusts_hist, thrusts];
+    force_per_M_hist = [force_per_M_hist, force_per_M];
+    delta_hat_x_per_M_hist = [delta_hat_x_per_M_hist, delta_hat_x_per_M];
 
     e_p = X - X_des(:, i); 
     e_pd = Xd - Xd_des(:, i);
@@ -239,10 +252,10 @@ for i = 1:N_sim_tmp
     times = [times; i * dt_sim];
 end
 %% State plot
-figure('Position',[100 50 800 900]);
+figure('Position',[50 300 700 600]);
 colors = lines(6);
 
-subplot(3,2,1)
+subplot(2,2,1)
 hold on
 for j = 1:3
     plot(times, X_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
@@ -255,7 +268,7 @@ legend({'$X_x$', '$X_x^{\mathrm{des}}$', ...
 title('$\mathbf{X}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
 % 2. Xd plot
-subplot(3,2,2)
+subplot(2,2,2)
 hold on
 for j = 1:3
     plot(times, Xd_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
@@ -268,7 +281,7 @@ legend({'$\dot{X}_x$', '$\dot{X}_x^{\mathrm{des}}$', ...
 title('$\dot{\mathbf{X}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
 % 3. w plot
-subplot(3,2,3)
+subplot(2,2,3)
 hold on
 for j = 1:3
     plot(times, w_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
@@ -283,7 +296,7 @@ title('${\omega}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
 % 4. wd plot
-subplot(3,2,4)
+subplot(2,2,4)
 hold on
 for j = 1:3
     plot(times, wd_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
@@ -296,17 +309,8 @@ legend({'$\dot{\omega}_x$', '$\dot{\omega}_x^{\mathrm{des}}$', ...
 title('$\dot{{\omega}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 %ylim([-1, 1])
 grid on
-
-% 7. thrusts
-subplot(3,2,5)
-hold on
-plot(times, thrusts_hist, 'LineWidth', 1.0);
-ylim([ -thrust_limit, thrust_limit] )
-title('Thrusts', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
 %% Error 
-figure('Position',[900 50 1000 700]);
+figure('Position',[750 300 600 600]);
 colors = lines(6);
 
 %e_p
@@ -368,4 +372,28 @@ for j = 1:3
 end
 legend({'$x$','$y$','$z$'},'Interpreter','latex','FontSize', 12);
 title('$\tilde{\Delta}_{p,i}$', 'Interpreter', 'latex','FontSize', 14)
+grid on
+%% Assumption: force/disturbance balance
+figure('Position',[1350 500 500 400]);
+
+% 7. thrusts
+subplot(3,1,1)
+hold on
+plot(times, thrusts_hist, 'LineWidth', 1.0);
+%ylim([ -thrust_limit, thrust_limit] )
+title('Thrusts', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+
+legend_entries = arrayfun(@(x) sprintf('%d', x), 1:num_AMs, 'UniformOutput', false);
+subplot(3,1,2)
+plot(times, force_per_M_hist)
+title('$\frac{\lambda_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
+legend(legend_entries)
+grid on
+
+subplot(3,1,3)
+plot(times, delta_hat_x_per_M_hist)
+title('$\frac{\Delta_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
+legend(legend_entries)
 grid on
