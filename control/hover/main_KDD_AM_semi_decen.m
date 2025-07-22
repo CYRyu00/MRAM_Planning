@@ -6,9 +6,9 @@ thrust_limit= params{6}; gravity = params{16};
 dt_sim = 0.001;
 N_sim = 20000;
 %% inertia
-shape = [1 1 1; % <- x | y
-         0 2 0; %      v
-         0 1 0];
+shape = [0 2 0; % <- x | y
+         0 0 0; %      v
+         0 0 0];
 shape_mass = [m0,  m0, m0;
               m0,  m0 * 1.5, m0;
               m0,  m0, m0];
@@ -39,11 +39,11 @@ for j =1:length(AMs_cols)
     AM_inertia = AM_inertia + I_cj{j};
 end
 %%
-wn = 1; damp = 1.2; % 1, 1.2
+wn = 1.0; damp = 1.2; % 1, 1.2
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
 
-wn = 1; damp = 1.2; % 1, 1.2
+wn = 1.0; damp = 1.2; % 1, 1.2
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
 
@@ -51,15 +51,17 @@ kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
 kw_I = 10; %10
+k_psi = 2; % 2 
+
 
 %regulizer
 k_lambda = 1.0;
 k_delta = 1.0;
 
 epsilon = kv_M(1, 1) * 0.3;
-alpha = 30 / m0; % 30 / m0
-gamma = 50 / m0; % 50 / m0 
-beta = diag([1 1 5]) * m0 * norm(gravity) * 3; % 1 1 5 * m0 * norm(gravity) * 3
+alpha = 15; % 15
+gamma = alpha * 3.0; % alpha * 3.0 
+beta = diag([1 1 5]) * m0 * norm(gravity) * 0.5; % 1 1 5 * m0 * norm(gravity) * 0.5
 N_sim_tmp = 10000;
 
 mass_uncertainty = 1.10; 
@@ -67,13 +69,13 @@ inertia_uncertainty = 0.90;
 thrust_limit = thrust_limit * 3;
 
 %disturbance
-sigma = 0.0; mean = 5.0; max_val = 30.0;
+sigma = 0.0; mean = 1.0; max_val = 30.0;
 disturb_sim = zeros(N_sim, 6);
 disturb = mean * [0; 0; 0; 0.5; -0.7; -1.0];
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 5 / 100; max_X = 0.1; % delicate
+sigma_X = 5 / 100; max_X = 0.1;
 sigma_w = 5 / 100; max_w = 0.1; 
 delay = 10; % position control delay dt_sim * delay
 delay_regul = 100; % lambda/delta regularizer delay dt_sim * delay
@@ -84,9 +86,9 @@ X_hover = [1; 2; 3] * 1e-1; yaw_hover = 0 / 180 *pi;
 [X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_hover(X_hover, yaw_hover, N_sim, dt_sim);
 radius = 0.3;  v_z = 0.05;
 omega     = 2 * pi * 0.1; 
-omega_yaw = 2 * pi * 0.05; 
-X_hover = [0; 0; 0.5]; yaw_hover = 0 / 180 *pi; 
-%[X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
+omega_yaw = 2 * pi * 0.1; 
+X_hover = [0; 0; 0.5]; yaw_hover = 30 / 180 *pi; 
+[X_des, Xd_des, Xdd_des, yaw_des, yawd_des, yawdd_des] = get_traj_helix(radius, omega, omega_yaw, v_z, X_hover, yaw_hover, N_sim, dt_sim);
 %%
 B = [r r -r -r;  -r r r -r; mu -mu mu -mu; 1 1 1 1];
 
@@ -106,7 +108,8 @@ w_des_prev = zeros(3, num_AMs);
 
 X_hist = []; Xd_hist = []; w_hist = []; wd_hist = []; R_hist = cell(N_sim, 1); 
 w_des_hist = []; wd_des_hist = []; thrusts_hist = []; F_hat_hist = [];
-e_p_hist = []; e_d_hist = [];e_w_hist = []; nu_e_hist = []; delta_hat_hist = []; delta_tilde_hist = [];
+e_p_hist = []; e_d_hist = []; e_w_hist = []; e_psi_hist = [];
+nu_e_hist = []; delta_hat_hist = []; delta_tilde_hist = [];
 force_per_M_hist = []; delta_hat_x_per_M_hist = [];
 times = [];
 
@@ -176,7 +179,13 @@ for i = 1:N_sim_tmp
         Ij = I_cj{j};
         kw_j = kw_I * norm(Ij);
         
-        w_des = [w_xj_des; w_yj_des; yawd_des(i)]; 
+        psi = atan2(R(2,1), R(1,1));
+        % TODO
+        e_psi = psi - yaw_des(i);
+        e_psi = wrapToPi(e_psi);
+        psid_des = - k_psi * e_psi + yawd_des(i);
+        w_zj_des = (psid_des - R(3,1) * w_xj_des - R(3,2) * w_yj_des ) / R(3,3);
+        w_des = [w_xj_des; w_yj_des; w_zj_des]; 
         if i > 1
             wd_des = w_des - w_des_prev(:, j);
         else
@@ -245,6 +254,7 @@ for i = 1:N_sim_tmp
     e_p_hist = [e_p_hist, e_p]; 
     e_d_hist = [e_d_hist, e_pd]; 
     e_w_hist = [e_w_hist, e_w];
+    e_psi_hist = [e_psi_hist, e_psi];
     nu_e_hist = [nu_e_hist, nu_ej];
     delta_hat_hist = [delta_hat_hist, delta_hat(:, j)];
     delta_tilde_hist = [delta_tilde_hist, mj / AM_mass * disturb(4:6) - delta_hat(:, j)];
@@ -298,16 +308,9 @@ grid on
 % 4. wd plot
 subplot(2,2,4)
 hold on
-for j = 1:3
-    plot(times, wd_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
-    plot(times, wd_des_hist(j, 1:i), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
-end
-legend({'$\dot{\omega}_x$', '$\dot{\omega}_x^{\mathrm{des}}$', ...
-        '$\dot{\omega}_y$', '$\dot{\omega}_y^{\mathrm{des}}$', ...
-        '$\dot{\omega}_z$', '$\dot{\omega}_z^{\mathrm{des}}$'}, ...
-        'Interpreter','latex','FontSize', 12);
-title('$\dot{{\omega}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
-%ylim([-1, 1])
+plot(times, e_psi_hist, 'LineWidth', 1.0);
+legend({'$e_\psi$'},'Interpreter', 'latex','FontSize', 12);
+title('$e_\psi$', 'Interpreter', 'latex','FontSize', 14)
 grid on
 %% Error 
 figure('Position',[750 300 600 600]);
