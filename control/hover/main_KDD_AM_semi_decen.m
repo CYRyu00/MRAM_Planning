@@ -113,7 +113,7 @@ delay = 0.01 / dt_sim; % position control delay dt_sim * delay
 wz_delay = 0.1 / dt_sim;
 delay_regul = 0.1 / dt_sim; % lambda/delta regularizer delay dt_sim * delay
 
-rng('shuffle')z
+rng('shuffle')
 
 if do_manip && norm(AM_com) < 1e-6
     X_hover = [1; 2; 3] * 1e-1;
