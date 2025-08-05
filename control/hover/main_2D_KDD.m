@@ -31,10 +31,9 @@ mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
 R_shape{1} = eye(3,3);
 R_shape{2} = Ry(10 / 180 *pi);
-
 R_shape{3} = Ry(20 / 180 *pi);
-R_shape{4} = Ry(-10 / 180 *pi);
-R_shape{5} = Ry(-10 / 180 *pi);
+R_shape{4} = Ry(30 / 180 *pi);
+R_shape{5} = Ry(40 / 180 *pi);
 l1 = 0.3; l2 = 0.3; % ca = 0.24
 
 AM_mass = sum(mass_ams);
@@ -69,8 +68,8 @@ kv_M = diag([kv_M, kv_M, kv_z]);
 kw_I = 20; % 10 or 20
 
 % servo moter
-kp_servo = 0.01; % 0.1
-kd_servo = 0.3; % 1.0
+kp_servo = 0.00; % 0.1
+kd_servo = 0.1; % 1.0
 damp_servo = 0.05; % 0.1
 
 % damped pseudoinverse
@@ -104,10 +103,10 @@ X_hover = [1; 0; 3] * 1e-1;
 rpy_hover = [0, -5, 0] / 180 * pi;
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, N_sim, dt_sim);
 % helix
-radius = 0.0;  v_z = 0.00;
+radius = 0.2;  v_z = 0.05;
 omega = 2 * pi * 0.1; 
-rpyd  = [0.00; 0.03; 0.0] * 2 * pi; 
-X_hover = [0; 0; 0.3]; rpy_hover = [0, -20, 0] / 180 * pi; 
+rpyd  = [0.00; 0.02; 0.0] * 2 * pi; 
+X_hover = [0.1; 0; 0.1]; rpy_hover = [0, 0, 0] / 180 * pi; 
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 
 %%
@@ -214,12 +213,12 @@ for i = 1:N_sim_tmp
         
         % End effector control
         pitch_des = atan2(R_e_des_j(1,3), R_e_des_j(1,1));
-        pitch = atan2(R_e_j(1,3), R_e_des_j(1,1));
+        pitch = atan2(R_e_j(1,3), R_e_j(1,1));
         e_pitch = wrapToPi(pitch - pitch_des);
         w_e_des_j = w_e_des_j(2);
         w_e_ref = w_e_des_j - k_pitch * e_pitch;
         thetad_ref = w_e_ref - w_quad_des(2);
-
+        
         if i > 1
             wd_quad_des = (w_quad_des - w_quad_des_prev(:, j)) / dt_sim / delay_quad;
         else
@@ -248,8 +247,8 @@ for i = 1:N_sim_tmp
         tau(j) = B(2,:) * thrust_j;
         force_j = B(4, :) * thrust_j;
 
-        term = S(rj) * [0; 0; force_j];
-        tau_tot(2) = tau_tot(2) + tau_theta(j) + term(2) ; % 1-dim
+        term = S(rj) * R_quad * [0; 0; force_j];
+        tau_tot(2) = tau_tot(2) + tau_theta(j) + term(2); % 1-dim
         force_tot = force_tot + force_j * Rt{j} * e_3; % 3 - dim
         
         phidd = It(2,2) \ (tau(j) - tau_theta(j));
