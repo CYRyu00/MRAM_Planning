@@ -1,18 +1,20 @@
 addpath("../dynamics", "../functions", "../../params" )
 clear; close all
 params = define_params_ver2();
-mq = params{1}; Iq = params{2}; mu = params{3}; r = params{4}; d = params{5};
+%mq = params{1}; Iq = params{2}; 
+mu = params{3}; r = params{4}; d = params{5};
 thrust_limit= params{6}; gravity = params{16};
 mb = params{17}; cb = params{18}; Ib = params{19};
 mt = params{20}; ct = params{21}; It = params{22};
 ma = params{23}; ca = params{24}; Ia = params{25};
 
-Ib = Ia + Ib;
+% totoal robotic arm
+Ib = Ia + Ib;% Ib = Ib * 0.01;
 mb = ma + mb;
 m0 = mt + mb;
 
 dt_sim = 0.002;
-N_sim = 20000;
+N_sim = 10000;
 
 B = [r r -r -r;  -r r r -r; mu -mu mu -mu; 1 1 1 1];
 
@@ -20,7 +22,7 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 %% inertia
-num_AMs = 2;
+num_AMs = 4;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -65,12 +67,12 @@ kv_z = 2 * damp *sqrt(kp_z);
 kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
-kw_I = 20; % 10 or 20
+kw_I = 50; % 10 or 20 or 100
 
 % servo moter
-kp_servo = 0.00; % 0.1
-kd_servo = 0.1; % 1.0
-damp_servo = 0.05; % 0.1
+kp_servo = 0.1; % 0.1 / 0.1
+kd_servo = 1.0; % 1.0 / 0.1 / 0.03
+damp_servo = 0.05; % 0.05
 
 % damped pseudoinverse
 damped = 0.0; % 0.3
@@ -86,13 +88,13 @@ inertia_uncertainty = 1.00;
 thrust_limit = thrust_limit * 3;
 
 %disturbance
-sigma = 0.0; mean = 0.0; max_val = 30.0;
+sigma = 0.0; mean = 1.0; max_val = 30.0;
 disturb_sim = zeros(N_sim, 6);
-disturb = mean * [0; 0; 0; 0.5; 0.0; -1.0];
+disturb = mean * [0; 0.0; 0; 0.0; 0.0; 0.0];
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 0 / 100; max_X = 0.1;
+sigma_X = 0 / 100; max_X = 0.05;
 sigma_w = 0 / 100; max_w = 0.1; 
 delay_bs = 0.004 / dt_sim;
 delay_quad = 0.004 / dt_sim;
@@ -100,13 +102,13 @@ delay_quad = 0.004 / dt_sim;
 rng('shuffle')
 
 X_hover = [1; 0; 3] * 1e-1;
-rpy_hover = [0, -5, 0] / 180 * pi;
+rpy_hover = [0, 5, 0] / 180 * pi;
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, N_sim, dt_sim);
 % helix
 radius = 0.2;  v_z = 0.05;
 omega = 2 * pi * 0.1; 
-rpyd  = [0.00; 0.02; 0.0] * 2 * pi; 
-X_hover = [0.1; 0; 0.1]; rpy_hover = [0, 0, 0] / 180 * pi; 
+rpyd  = [0.00; 0.01; 0.0] * 2 * pi;
+X_hover = [0.1; 0; 0.3]; rpy_hover = [0, 0, 0] / 180 * pi; 
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 
 %%
@@ -114,9 +116,9 @@ X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
 w = [0; 0; 0]; wd = [0; 0; 0];
 Xddd_des_quad = zeros(3, num_AMs);
 
-phi = zeros(1, num_AMs); phid = zeros(1, num_AMs);
-theta = zeros(1, num_AMs); thetad = zeros(1, num_AMs); thetadd = zeros(1, num_AMs);
-theta_ref = zeros(1, num_AMs); %thetad_ref = zeros(2, num_AMs);
+phi = zeros(num_AMs, 1); phid = zeros(num_AMs, 1);
+theta = zeros(num_AMs, 1); thetad = zeros(num_AMs, 1); thetadd = zeros(num_AMs, 1);
+theta_ref = zeros(num_AMs, 1); %thetad_ref = zeros(2, num_AMs);
 R = eye(3, 3);
 Rd = R * S(w);
 Rt = cell(1, num_AMs);
@@ -136,13 +138,14 @@ force_per_M_hist = []; delta_hat_x_per_M_hist = [];
 e_theta_hist = []; e_thetad_hist = [];
 e_pitch_hist = []; e_R_hist = [];
 pitch_hist = [];pitch_des_hist = [];
+phi_hist = [];
 times = [];
 
 for i = 1:N_sim_tmp
     % Semi-decentralized control
     tau_tot = zeros(3, 1);
     tau = zeros(1, num_AMs);
-    tau_theta = zeros(1, num_AMs);
+    tau_theta = zeros(num_AMs, 1);
     force_tot = [0; 0; 0];
     thrusts = [];
     force_per_M = [];
@@ -230,22 +233,25 @@ for i = 1:N_sim_tmp
         
         %quad rotor : kinematic level?
         tau(j) = (It(2,2) + Ib(2,2)) * wd_quad_des(2)  - kw_j * e_w_quad(2); 
+        %tau(j) = tau(j) - disturb(2)/num_AMs;
         end
 
         % servo motor
         theta_ref(j) = theta_ref(j) + thetad_ref * dt_sim;
         e_theta = theta(j) - theta_ref(j) ;
         e_thetad = thetad(j) - thetad_ref;
-        tau_theta(j) = - kp_servo * e_theta - kd_servo * e_thetad - damp_servo * thetad(:, j); % 2-dim
+        tau_theta(j) = - kp_servo * e_theta - kd_servo * e_thetad - damp_servo * thetad(j); % 1-dim
 
         % TODO
         %tau(j) = tau(j) + tau_theta(j);
+        %tau(j) = tau(j) - disturb(2)/num_AMs;
  
         thrust_j = inv(B) * [0; tau(j); 0; force_j];
         thrust_j = min(thrust_limit, max(-thrust_limit, thrust_j));
         
         tau(j) = B(2,:) * thrust_j;
         force_j = B(4, :) * thrust_j;
+        force_j = force_j; 
 
         term = S(rj) * R_quad * [0; 0; force_j];
         tau_tot(2) = tau_tot(2) + tau_theta(j) + term(2); % 1-dim
@@ -272,9 +278,9 @@ for i = 1:N_sim_tmp
     disturb_sim(i,:) = disturb;
 
     %force_tot : sigma lambdai *Ri *e3
-    Xdd = AM_mass\(force_tot - AM_mass * 9.81 * e_3);
+    Xdd = AM_mass\(force_tot - AM_mass * 9.81 * e_3 + disturb(4:6));
     % tau_tot : sigma tau_i + tau_theta(1) + r x lambda
-    wd = inv(AM_inertia) * (tau_tot - S(w) * AM_inertia * w);
+    wd = inv(AM_inertia) * (tau_tot - S(w) * AM_inertia * w + [0;disturb(2);0]);
 
     Xd = Xd + Xdd * dt_sim;
     X = X + Xd * dt_sim + 0.5 * Xdd * dt_sim^2 ;
@@ -312,6 +318,7 @@ for i = 1:N_sim_tmp
     
     pitch_hist = [pitch_hist, wrapToPi(pitch)];
     pitch_des_hist = [pitch_des_hist, wrapToPi(pitch_des)];
+    phi_hist = [phi_hist, phi];
    
     e_pitch_hist = [e_pitch_hist, e_pitch];
     e_theta_hist = [e_theta_hist, e_theta];
@@ -320,7 +327,7 @@ for i = 1:N_sim_tmp
     times = [times; i * dt_sim];
 end
 %% State plot
-figure('Position',[50 350 700 600]);
+figure('Position',[50 350 500 500]);
 colors = lines(6);
 
 subplot(2,2,1)
@@ -331,7 +338,7 @@ for j = [1, 3]
 end
 legend({'$X_x$', '$X_x^{\mathrm{des}}$', ...
         '$X_z$', '$X_z^{\mathrm{des}}$'}, ...
-        'Interpreter','latex','FontSize', 12);
+        'Interpreter','latex','FontSize', 10);
 title('$\mathbf{X}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
 % 2. Xd plot
@@ -343,7 +350,7 @@ for j = [1, 3]
 end
 legend({'$\dot{X}_x$', '$\dot{X}_x^{\mathrm{des}}$', ...
         '$\dot{X}_z$', '$\dot{X}_z^{\mathrm{des}}$'}, ...
-        'Interpreter','latex','FontSize', 12);
+        'Interpreter','latex','FontSize', 10);
 title('$\dot{\mathbf{X}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
 % 3. w plot
@@ -491,6 +498,64 @@ end
 legend({'$pitch$'},'Interpreter','latex','FontSize', 12);
 title('$e_{\dot\theta}$', 'Interpreter', 'latex','FontSize', 14)
 grid on
+%% Video
+figure('Position',[600 100 800 800]);
+dN = 0.2 / dt_sim;
+framesPerSecond = 1/dt_sim/dN;
+rate = rateControl(framesPerSecond);
+arrow_len = 0.2;
+for i = 1:dN:N_sim_tmp
+    clf;
+    grid on; axis equal;
+    xlim([X_des(1, i) - (l1+l2)/2*num_AMs*1.3, X_des(1, i) + (l1+l2)/2*num_AMs*1.3 ] )
+    ylim([X_des(3, i) - (l1+l2)/2*num_AMs*1.3, X_des(3, i) + (l1+l2)/2*num_AMs*1.3 ])
+    
+    hold on;
+    pitch = pitch_hist(i);
+    R = Ry(pitch);
+    
+    for j = 1:num_AMs
+        R_e_j = R * R_shape{j};
+        X_quad = X_hist(:, i) + R * r_cj{j};
+        R_quad = Ry(phi_hist(j, i));
+        dx = force_per_M_hist(j, i) / 9.8 * arrow_len * R_quad(1,3);
+        dz = force_per_M_hist(j, i) / 9.8 * arrow_len * R_quad(3,3);       
+        plot(X_quad(1), X_quad(3), 'o', 'Color', 'b');
+        quiver(X_quad(1), X_quad(3), dx, dz, 0, 'r', 'LineWidth', 1.5);
+        
+        X1 = X_quad + l1 * R_e_j * e_1;
+        X2 = X_quad - l2 * R_e_j * e_1;
+        plot([X1(1), X2(1)], [X1(3), X2(3)], 'b-', 'LineWidth', 1.0);
+   
+    end
+
+    pitch_des = pitch_des_hist(i);
+    R_des = Ry(pitch_des);
+    
+    for j = 1:num_AMs
+        R_e_des_j = R_des * R_shape{j};
+        X_des_quad = X_des(:, i) + R_des * r_cj{j};
+        %dx = arrow_len * R_e_des_j(1,1);
+        %dz = arrow_len * R_e_des_j(3,1);       
+        plot(X_des_quad(1), X_des_quad(3), 'o', 'Color', 'black', 'LineWidth', 2.0);
+        %quiver(X_des_quad(1), X_des_quad(3), dx, dz, 0, 'black', 'LineWidth', 2.0);
+
+        X1 = X_des_quad + l1 * R_e_des_j * e_1;
+        X2 = X_des_quad - l2 * R_e_des_j * e_1;
+        plot([X1(1), X2(1)], [X1(3), X2(3)], 'k--', 'LineWidth', 2.0);
+    end
+
+    % com
+    plot(X_hist(1, i), X_hist(3, i), 'o', 'Color', 'b', 'MarkerSize', 10);
+    plot(X_des(1, i), X_des(3, i), 'o', 'Color', 'k', 'MarkerSize', 8);
+
+    xlabel('X position'); ylabel('Z position');
+    title_string = sprintf("time : %.2f sec", times(i));
+    title(title_string);
+    drawnow
+    %waitfor(rate);
+end
+
 %%
 function out = Rx(q)
     out = [1, 0, 0;
