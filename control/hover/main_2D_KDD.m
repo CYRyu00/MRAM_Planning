@@ -1,5 +1,6 @@
-addpath("../dynamics", "../functions", "../../params" )
+addpath("../dynamics", "../functions", "../../params", "../../../casadi-3.6.7-windows64-matlab2018b" )
 clear; close all
+import casadi.*
 params = define_params_ver2();
 %mq = params{1}; Iq = params{2}; 
 mu = params{3}; r = params{4}; d = params{5};
@@ -22,7 +23,7 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 %% inertia
-num_AMs = 4;
+num_AMs = 5;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -31,11 +32,10 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-R_shape{1} = eye(3,3);
-R_shape{2} = Ry(10 / 180 *pi);
-R_shape{3} = Ry(20 / 180 *pi);
-R_shape{4} = Ry(30 / 180 *pi);
-R_shape{5} = Ry(40 / 180 *pi);
+shape_pitch =[0 10 20 -20 -10 0 10];
+for j = 1:length(shape_pitch)
+    R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
+end
 l1 = 0.3; l2 = 0.3; % ca = 0.24
 
 AM_mass = sum(mass_ams);
@@ -56,54 +56,62 @@ for j = 1:num_AMs
 end
 
 %%
-wn = 2.0; damp = 1.2; % 0.5, 1.2
+wn = 1.5; damp = 1.1; % 0.5, 1.2
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
 
-wn = 2.0; damp = 1.2; % 1, 1.2
+wn = 1.5; damp = 1.1; % 1, 1.2
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
 
 kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
-kw_I = 30; % 10 or 20 or 100
+kw_I = 20; % 10 or 20 or 100
 
 % servo moter
 kp_servo = 0.01; % 0.1 / 0.01
 kd_servo = 0.1; % 1.0 / 0.1 / 0.03
 damp_servo = 0.05; % 0.05
 
-% damped pseudoinverse
+% endeffector control
 damped = 0.0; % 0.3
-k_pitch = 0.5; % 1.0
+k_pitch = 1.0; % 1.0
 
-% MBO gain
-k_mbo = diag([1.0 1.0 1.0 1.0]) * 5e0;
-k_optim = 10; % 클수록 토크 적게 씀 -> 안정적
+% MBO gain : 게인값을 높이고 필터링도 괜찮을듯 
+k_mbo = diag([1.0 1.0 1.0 1.0]) * 3e0; % 3e0
+dt_lpf = 0.2;
+
 do_optim = true;
+k_R_cen = 200.0; % 200
+k_w_cen = 5.0; % 5
+if num_AMs == 1 % single인 경우는 없는게 나은듯
+    k_R_cen = 0.0;
+    k_w_cen = 0.0;
+end 
 
 % Backstepping gain
 epsilon = kv_M(1, 1) * 0.3; % kv_M(1, 1) * 0.7
-alpha = 10; % 4 or 5
+alpha = 10; % 4 or 10
 gamma = alpha * 1.0; % alpha * 1.0 
 N_sim_tmp = 5000;
 
 mass_uncertainty = 1.00; 
 inertia_uncertainty = 1.00;
-thrust_limit = thrust_limit * 1; % *3
+thrust_limit = thrust_limit * 1.5; % 1 ~ 3
+w_des_limit = 5.0; % 2 ~ 10
 
 show_video = true;
 
-%disturbance
-mean = 1.0; max_val = 1000.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * 0; 
+% disturbance
+% payload at EE
+payload = 7; moment_arm = 1.0;
+disturb_final = payload * 9.81 *[0.2; 0.0; -1.0; 0.0; norm(r_cj{1}) * moment_arm ; 0.0]; % force; moment
+%
+mean = 0.0; max_val = 500.0;
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.5; 
 disturb_sim = zeros(N_sim, 6);
 disturb = mean * [0.7; 0.0; 10.0; 0.0; -0.5; 0.0]; % force; moment
-% payload at EE
-payload = 5; moment_arm = 1.0;
-disturb = payload * 9.81 *[0.0; 0.0; -1.0; 0.0; norm(r_cj{1}) * moment_arm ; 0.0]; % force; moment
-%max_val = payload * 9.81 *2;
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
@@ -114,17 +122,19 @@ delay_bs = 0.004 / dt_sim;
 delay_quad = 0.004 / dt_sim;
 delay_mbo = 0.01 / dt_sim; % 0.01
 
+
 rng('shuffle')
 
 X_hover = [1; 0; 3] * 1e-1;
-rpy_hover = [0, 5, 0] / 180 * pi;
+rpy_hover = [0, -20, 0] / 180 * pi;
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, N_sim, dt_sim);
 % helix
-radius = 0.2;  v_z = 0.05;
-omega = 2 * pi * 0.1; 
-rpyd  = [0.00; 0.01; 0.0] * 2 * pi;
+radius = 0.3;  v_z = 0.1;
+omega = 2 * pi * 0.2; 
+rpyd  = [0.00; -0.02; 0.0] * 2 * pi;
 X_hover = [0.1; 0; 0.3]; rpy_hover = [0, 0, 0] / 180 * pi; 
-[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
+%[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
+
 
 %%
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
@@ -151,6 +161,8 @@ force_tot_mbo = AM_mass * norm(gravity) * e_3;
 tau_tot_mbo = zeros(3, 1);
 lambda_mbo = lambda_prev;
 phi_prev = phi; phid_prev = phid;
+Delta_p_opt = zeros(3, num_AMs); Delta_w_opt = zeros(1, num_AMs);
+
 w_quad_des_prev = zeros(3, num_AMs);
 
 X_hist = []; Xd_hist = []; w_hist = []; wd_hist = []; R_hist = cell(N_sim, 1); 
@@ -166,7 +178,7 @@ times = [];
 
 tic
 for i = 1:N_sim_tmp
-    if mod(i, N_sim_tmp/100) == 1
+    if mod(i, N_sim_tmp/100) == 0
         fprintf("\n%d / %d\n", i, N_sim_tmp)
     end
     tau_tot = zeros(3, 1);
@@ -191,38 +203,75 @@ for i = 1:N_sim_tmp
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         h = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)];
         int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + delta_hat_tot) * dt_sim * delay_mbo; 
-        delta_hat_tot = k_mbo * (h - int_mbo - h_0);
+        % 1-order LPF
+        delta_hat_tot_sensored = k_mbo * (h - int_mbo - h_0);
+        delta_hat_tot = (dt_lpf * delta_hat_tot + dt_sim * delay_mbo * delta_hat_tot_sensored) / (dt_lpf + dt_sim * delay_mbo);
+        
         tau_tot_mbo = zeros(3, 1);
         
-        % TODO: check smoothness, make faster
+        % TODO: check smoothness
         if do_optim
-        cvx_begin quiet
-        %cvx_precision low
-            variables Delta_p(3, num_AMs) Delta_w(1, num_AMs)
-            expression costs(num_AMs)
-            for j = 1:num_AMs
-                costs(j) = norm(Delta_p(:, j)) + k_optim * norm(Delta_w(:, j));
-            end
-            expression moment(3)
-            moment = zeros(1, 1);
-            for j = 1:num_AMs
-                moment = moment + Delta_w(:, j) + e_2' * cross(r_cj{j}, Delta_p(:, j));
-            end
-            
-            minimize( max(costs) )
-            subject to
-                sum(Delta_p, 2) == delta_hat_tot(1:3);
-                moment == delta_hat_tot(4);
-        cvx_end
-        delta_hatd = ([Delta_p; Delta_w] - delta_hat) / dt_sim / delay_mbo;
-        delta_hat = [Delta_p; Delta_w];
+        % central feedback
+        e_R_cen = 0.5 * vee(R_e_des{i}' * R - R' * R_e_des{i});
+        e_w_cen = w - R' * R_e_des{i} * w_e_des(:, i);
+
+        %disp(e_R_cen')
+        %disp(e_w_cen')
+        % optimization
+        kappa = 0.1;  % 0.1
+        k_optim = 1e5; % 클수록 토크 적게 씀 -> 안정적
+        
+        Delta_p = MX.sym('Delta_p', 3, num_AMs);  % 3 × num_AMs
+        Delta_w = MX.sym('Delta_w', 1, num_AMs);  % 1 × num_AMs
+        
+        costs = [];
+        for j = 1:num_AMs
+            cost_j = Delta_p(:, j)' * Delta_p(:, j) + k_optim * Delta_w(:, j)' * Delta_w(:, j);
+            costs = [costs; cost_j];
+        end
+        
+        exp_terms = exp(kappa * costs);
+        obj = log(sum(exp_terms));
+        
+        moment = MX.zeros(1,1);
+        for j = 1:num_AMs
+            moment = moment + Delta_w(:,j) + e_2' * cross(r_cj{j}, R' * Delta_p(:,j));
+            %moment = moment + Delta_w(:,j) + e_2' * cross(r_cj{j}, Delta_p(:,j)); % 왜 이게 잘되는거지...?
+        end
+        
+        g = [sum(Delta_p, 2); moment];
+        
+        opt_var = [Delta_p(:); Delta_w(:)]; 
+        
+        nlp_prob = struct('x', opt_var, 'f', obj, 'g', g);
+        nlp_opts = struct;
+        nlp_opts.ipopt.print_level = 1;
+        nlp_opts.ipopt.tol = 1e-5;
+        %nlp_opts.ipopt.max_iter = max_iter;
+        nlp_opts.ipopt.mu_strategy = 'adaptive';
+        %nlp_opts.ipopt.linear_solver = 'mumps';
+        nlp_opts.ipopt.jacobian_approximation = 'exact';
+        %nlp_opts.ipopt.hessian_approximation = 'limited-memory';
+        nlp_opts.print_time = 0;
+        
+        solver = nlpsol('solver', 'ipopt', nlp_prob, nlp_opts);
+        opt_var0 = [Delta_p_opt(:); Delta_w_opt(:)];
+        LBG = delta_hat_tot + [0;0;0; e_2' * (k_R_cen * e_R_cen + k_w_cen * e_w_cen)];
+        UBG = LBG;
+        sol = solver('x0', opt_var0, 'lbg', LBG, 'ubg', UBG);
+
+        Delta_p_opt = reshape(full(sol.x(1:3*num_AMs)), 3, num_AMs);
+        Delta_w_opt = reshape(full(sol.x(3*num_AMs+1:end)), 1, num_AMs);
+
+        delta_hatd = ([Delta_p_opt; Delta_w_opt] - delta_hat) / dt_sim / delay_mbo;
+        delta_hat = [Delta_p_opt; Delta_w_opt];
+        %disp(solver.stats.return_status)
         %disp(delta_hat)
-        %disp(delta_hat_tot)
         end
     end
 
-    %for j = num_AMs:-1:1
-    for j = 1:num_AMs
+    for j = num_AMs:-1:1
+    %for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};
@@ -261,7 +310,9 @@ for i = 1:N_sim_tmp
     
             lambda_prev(j) = lambda_prev(j) + lambdad * dt_sim * delay_bs;
     
+            
             w_quad_des = [w_xj_des; w_yj_des; 0.0]; 
+            w_quad_des = max(-w_des_limit, min(w_des_limit, w_quad_des)); 
         end
                
         % rotaion control
@@ -337,6 +388,9 @@ for i = 1:N_sim_tmp
     end
     % generate disturbance
     disturb_dot = randn(6, 1) .* sigma;
+    if i < N_sim_tmp/2
+        disturb_dot = disturb_dot + disturb_final /N_sim_tmp / dt_sim * 2;
+    end
     disturb = disturb + disturb_dot * dt_sim;
     disturb = min(max(disturb, - max_val), max_val);
     disturb_sim(i,:) = disturb;
@@ -597,15 +651,15 @@ grid on
 %% Video
 if show_video
 figure('Position',[600 100 800 800]);
-dN = 0.2 / dt_sim;
-framesPerSecond = 1/dt_sim/dN;
+dN = 0.1 / dt_sim;
+framesPerSecond = 1/dt_sim/dN * 2;
 rate = rateControl(framesPerSecond);
 arrow_len = 0.2;
 for i = 1:dN:N_sim_tmp
     clf;
     grid on; axis equal;
-    %xlim([X_des(1, i) - (l1+l2)/2*num_AMs*1.3, X_des(1, i) + (l1+l2)/2*num_AMs*1.3 ] )
-    %ylim([X_des(3, i) - (l1+l2)/2*num_AMs*1.3, X_des(3, i) + (l1+l2)/2*num_AMs*1.3 ])
+    xlim([X_des(1, i) - (l1+l2)/2*num_AMs*2.0, X_des(1, i) + (l1+l2)/2*num_AMs*2.0 ] )
+    ylim([X_des(3, i) - (l1+l2)/2*num_AMs*2.0, X_des(3, i) + (l1+l2)/2*num_AMs*2.0 ])
     
     hold on;
     pitch = pitch_hist(i);

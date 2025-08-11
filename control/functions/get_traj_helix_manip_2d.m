@@ -45,20 +45,23 @@ function  [X_des, Xd_des, Xdd_des, Xddd_des, ...
         
         % rotation
         R_e = rpy2rot(roll, pitch, yaw);
-        Rd = (R_e - R_e_prev) / dt_sim;
-        w_e = vee(R_e' * Rd);
+        matrix = [1,       0,           -sin(pitch);
+                  0,  cos(roll),  sin(roll)*cos(pitch);
+                  0, -sin(roll),  cos(roll)*cos(pitch)];
+        w_e = matrix * rpyd;
         wd_e = (w_e - w_e_prev) / dt_sim;
         
         w_e_prev = w_e;
-        R_e_prev = R_e;
 
         roll = roll + rpyd(1) * dt_sim;
         pitch = pitch + rpyd(2) * dt_sim;
         yaw = yaw + rpyd(3) * dt_sim;
 
-        if roll > pi/4 rpyd(1) = rpyd(1) * (1 - dt_sim/2); end   
-        if pitch > pi/4 rpyd(2) = rpyd(2) *(1 - dt_sim/2); end
-        if yaw > pi/4 rpyd(3) = rpyd(3) * (1 - dt_sim/2); end
+        if abs(roll) > pi/6 rpyd(1) = rpyd(1) * (1 - dt_sim); end   
+        if abs(pitch) > pi/6
+            rpyd(2) = rpyd(2) *(1 - dt_sim); 
+        end
+        if abs(yaw) > pi/6 rpyd(3) = rpyd(3) * (1 - dt_sim); end
 
         R_e_des{k} = R_e;
         w_e_des = [w_e_des, w_e];
