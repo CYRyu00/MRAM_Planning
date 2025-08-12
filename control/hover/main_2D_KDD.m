@@ -67,7 +67,7 @@ kv_z = 2 * damp *sqrt(kp_z);
 kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
-kw_I = 20; % 10 or 20 or 100
+kw_I = 100; % 10 or 20 or 100
 
 % servo moter
 kp_servo = 0.01; % 0.1 / 0.01
@@ -76,14 +76,18 @@ damp_servo = 0.05; % 0.05
 
 % endeffector control
 damped = 0.0; % 0.3
-k_pitch = 1.0; % 1.0
+k_pitch = 0.5; % 1.0
 
 % MBO gain : 게인값을 높이고 필터링도 괜찮을듯 
 k_mbo = diag([1.0 1.0 1.0 1.0]) * 3e0; % 3e0
 dt_lpf = 0.2;
 
+% optimization
 do_optim = true;
-k_R_cen = 200.0; % 200
+kappa = 30;  % 30
+k_optim = 1e5; % 클수록 토크 적게 씀 -> 안정적
+
+k_R_cen = 300.0; % 200
 k_w_cen = 5.0; % 5
 if num_AMs == 1 % single인 경우는 없는게 나은듯
     k_R_cen = 0.0;
@@ -94,30 +98,36 @@ end
 epsilon = kv_M(1, 1) * 0.3; % kv_M(1, 1) * 0.7
 alpha = 10; % 4 or 10
 gamma = alpha * 1.0; % alpha * 1.0 
-N_sim_tmp = 5000;
 
-mass_uncertainty = 1.00; 
-inertia_uncertainty = 1.00;
+% Simulation Parmeters
+N_sim_tmp = 8000;
+show_video = true;
+
+% Thrust limit and w_des limit
 thrust_limit = thrust_limit * 1.5; % 1 ~ 3
 w_des_limit = 5.0; % 2 ~ 10
-
-show_video = true;
 
 % disturbance
 % payload at EE
 payload = 7; moment_arm = 1.0;
 disturb_final = payload * 9.81 *[0.2; 0.0; -1.0; 0.0; norm(r_cj{1}) * moment_arm ; 0.0]; % force; moment
-%
+rising_time = 5;
 mean = 0.0; max_val = 500.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.5; 
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0; 
 disturb_sim = zeros(N_sim, 6);
 disturb = mean * [0.7; 0.0; 10.0; 0.0; -0.5; 0.0]; % force; moment
+
+% Modeling error
+mass_uncertainty = 1.00; 
+inertia_uncertainty = 1.00;
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
 sigma_X = 0 / 100; max_X = 0.05;
 sigma_w = 0 / 100; max_w = 0.1; 
+
+% Delay
 delay_bs = 0.004 / dt_sim;
 delay_quad = 0.004 / dt_sim;
 delay_mbo = 0.01 / dt_sim; % 0.01
@@ -126,7 +136,7 @@ delay_mbo = 0.01 / dt_sim; % 0.01
 rng('shuffle')
 
 X_hover = [1; 0; 3] * 1e-1;
-rpy_hover = [0, -20, 0] / 180 * pi;
+rpy_hover = [0, 10, 0] / 180 * pi;
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, N_sim, dt_sim);
 % helix
 radius = 0.3;  v_z = 0.1;
@@ -214,12 +224,6 @@ for i = 1:N_sim_tmp
         % central feedback
         e_R_cen = 0.5 * vee(R_e_des{i}' * R - R' * R_e_des{i});
         e_w_cen = w - R' * R_e_des{i} * w_e_des(:, i);
-
-        %disp(e_R_cen')
-        %disp(e_w_cen')
-        % optimization
-        kappa = 0.1;  % 0.1
-        k_optim = 1e5; % 클수록 토크 적게 씀 -> 안정적
         
         Delta_p = MX.sym('Delta_p', 3, num_AMs);  % 3 × num_AMs
         Delta_w = MX.sym('Delta_w', 1, num_AMs);  % 1 × num_AMs
@@ -230,8 +234,9 @@ for i = 1:N_sim_tmp
             costs = [costs; cost_j];
         end
         
-        exp_terms = exp(kappa * costs);
-        obj = log(sum(exp_terms));
+        costs_normalized = costs / sqrt(costs' * costs + 1e-6);
+        exp_terms = exp(kappa * costs_normalized);
+        obj = log(sum(exp_terms)) * sqrt(costs' * costs + 1e-6) / kappa;
         
         moment = MX.zeros(1,1);
         for j = 1:num_AMs
@@ -245,8 +250,8 @@ for i = 1:N_sim_tmp
         
         nlp_prob = struct('x', opt_var, 'f', obj, 'g', g);
         nlp_opts = struct;
-        nlp_opts.ipopt.print_level = 1;
-        nlp_opts.ipopt.tol = 1e-5;
+        nlp_opts.ipopt.print_level = 0;
+        nlp_opts.ipopt.tol = 1e-3;
         %nlp_opts.ipopt.max_iter = max_iter;
         nlp_opts.ipopt.mu_strategy = 'adaptive';
         %nlp_opts.ipopt.linear_solver = 'mumps';
@@ -346,9 +351,6 @@ for i = 1:N_sim_tmp
             % quad rotor : kinematic level?
             tau(j) = (It(2,2) + Ib(2,2)) * wd_quad_des(2) - kw_j * e_w_quad(2);
             tau(j) = tau(j) - delta_hat(4, j);
-            % TODO
-            %tau(j) = tau(j) + tau_theta(j);
-            %tau(j) = tau(j) - disturb(5)/num_AMs;
         end
 
         % servo motor
@@ -388,17 +390,17 @@ for i = 1:N_sim_tmp
     end
     % generate disturbance
     disturb_dot = randn(6, 1) .* sigma;
-    if i < N_sim_tmp/2
-        disturb_dot = disturb_dot + disturb_final /N_sim_tmp / dt_sim * 2;
+    if i < rising_time/dt_sim
+        disturb_dot = disturb_dot + disturb_final / rising_time;
     end
     disturb = disturb + disturb_dot * dt_sim;
     disturb = min(max(disturb, - max_val), max_val);
     disturb_sim(i,:) = disturb;
 
     %force_tot : sigma lambdai *Ri *e3
-    Xdd = AM_mass\(force_tot - AM_mass * 9.81 * e_3 + disturb(1:3));
+    Xdd = (AM_mass * mass_uncertainty)\(force_tot - (AM_mass * mass_uncertainty) * 9.81 * e_3 + disturb(1:3));
     % tau_tot : sigma tau_i + tau_theta(1) + r x lambda
-    wd = inv(AM_inertia - It * num_AMs) * (tau_tot - S(w) * (AM_inertia - It * num_AMs) * w + disturb(4:6));
+    wd = inv(AM_inertia * inertia_uncertainty - It * num_AMs) * (tau_tot - S(w) * (AM_inertia * inertia_uncertainty - It * num_AMs) * w + disturb(4:6));
     
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         force_tot_mbo = force_tot;
