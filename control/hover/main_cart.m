@@ -23,7 +23,7 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 %% inertia
-num_AMs = 5;
+num_AMs = 7;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -32,11 +32,15 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-shape_pitch =[0 10 20 -20 -10 0 10];
+shape_pitch = [30 10 20 -20 -10 0 10 10 20 30 -10 -20 -30 -20];
 for j = 1:length(shape_pitch)
-    R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
+    R_shape{j} = Ry(shape_pitch(j) / 180 * pi); % from EE to i'th EE
 end
 l1 = 0.3; l2 = 0.3; % ca = 0.24
+
+M_o = 10; box_width = 1.0; box_height = 0.6;
+mu_st = 0.9;
+mu_dyna = 0.7;
 
 AM_mass = sum(mass_ams);
 for j = 1:num_AMs
@@ -55,6 +59,8 @@ for j = 1:num_AMs
     AM_inertia = AM_inertia + I_cj{j};
 end
 
+r_e = r_cj{1} + l1 * R_shape{1} * e_1; % position of EE w.r.t AM's com
+r_o = r_e +  [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
 %%
 wn = 1.5; damp = 1.1; % 0.5, 1.2
 kp_M = wn^2; 
@@ -67,7 +73,7 @@ kv_z = 2 * damp *sqrt(kp_z);
 kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
-kw_I = 20; % 10 or 20 or 100
+kw_I = 100; % 10 or 20 or 100
 
 % servo moter
 kp_servo = 0.01; % 0.1 / 0.01
@@ -87,7 +93,7 @@ do_optim = true;
 kappa = 30;  % 30
 k_optim = 1e5; % 클수록 토크 적게 씀 -> 안정적
 
-k_R_cen = 30.0; % 10 ~ 30
+k_R_cen = 300.0; % 200
 k_w_cen = 5.0; % 5
 if num_AMs == 1 % single인 경우는 없는게 나은듯
     k_R_cen = 0.0;
@@ -100,7 +106,7 @@ alpha = 10; % 4 or 10
 gamma = alpha * 1.0; % alpha * 1.0 
 
 % Simulation Parmeters
-N_sim_tmp = 15000;
+N_sim_tmp = 20000;
 show_video = true;
 save_video = true;
 video_speed = 1.0;
@@ -111,12 +117,12 @@ w_des_limit = 5.0; % 2 ~ 10
 
 % disturbance
 % payload at EE
-payload = 7; moment_arm = 1.0;
-disturb_final = payload * 9.81 *[0.0; 0.0; -1.0; 0.0; norm(r_cj{1}) * moment_arm ; 0.0]; % force; moment
-rising_time = 3;
+payload = 0; moment_arm = 1.0;
+rising_time = 5;
 mean = 0.0; max_val = 500.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.7;
-noise = zeros(6, 1);
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0;
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * 5 * 9.81;
+noise = zeros(6, 1); % force; moment
 disturb_sim = zeros(N_sim, 6);
 
 % Modeling error
@@ -136,14 +142,14 @@ delay_mbo = 0.01 / dt_sim; % 0.01
 
 rng('shuffle')
 
-X_hover = [1; 0; 3] * 1e-1;
-rpy_hover = [0, 10, 0] / 180 * pi; velocity = [-0.0; 0; 0]; maximum_X = [10.0; 0; 10.0];
+X_hover = [-0.5; 0; 0.0] * 1e0;
+rpy_hover = [0, 0, 0] / 180 * pi; velocity = [-0.1; 0; 0]; maximum_X = [1.0; 0; 1.0];
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, velocity, maximum_X, N_sim, dt_sim);
 % helix
-radius = 0.3;  v_z = 0.1;
-omega = 2 * pi * 0.2; 
-rpyd  = [0.00; -0.02; 0.0] * 2 * pi;
-X_hover = [0.1; 0; 0.3]; rpy_hover = [0, 0, 0] / 180 * pi; 
+radius = 0.3;  v_z = 0.0;
+omega = 2 * pi * 0.01; 
+rpyd  = [0.00; 0.00; 0.0] * 2 * pi;
+X_hover = [0.0; 0; 0.0]; rpy_hover = [0, 0, 0] / 180 * pi; 
 %[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 %%
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
@@ -241,6 +247,7 @@ for i = 1:N_sim_tmp
         moment = MX.zeros(1,1);
         for j = 1:num_AMs
             moment = moment + Delta_w(:,j) + e_2' * cross(r_cj{j}, R' * Delta_p(:,j));
+            %moment = moment + Delta_w(:,j) + e_2' * cross(r_cj{j}, Delta_p(:,j)); % 왜 이게 잘되는거지...?
         end
         
         g = [sum(Delta_p, 2); moment];
@@ -379,7 +386,7 @@ for i = 1:N_sim_tmp
         Rt{j} = Ry(phi(j));
 
         theta(j) = wrapToPi(atan2(R_e_j(1,3), R_e_j(1,1)) - phi(j));
-        thetad_prev = thetad(j);
+        thetad_prev = thetad(j); 
         thetad(j) = wrapToPi(w_e_j(2) - phid(j));
         thetadd(j) = (thetad(j) - thetad_prev) / dt_sim;
 
@@ -398,10 +405,23 @@ for i = 1:N_sim_tmp
     disturb_sim(i,:) = disturb;
 
     %force_tot : sigma lambdai *Ri *e3
-    Xdd = (AM_mass * mass_uncertainty)\(force_tot - (AM_mass * mass_uncertainty) * 9.81 * e_3 + disturb(1:3));
+    Xdd = (M_o + AM_mass * mass_uncertainty)\(force_tot - (M_o + AM_mass * mass_uncertainty) * 9.81 * e_3 + disturb(1:3));
+    Xdd(2) = 0; Xdd(3) = 0;
+    %disp(Xdd')
+    if abs(Xd(1)) < 1e-3
+        if abs(Xdd(1)) < mu_st * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty)
+            Xdd(1) = 0;
+            Xd(1) = 0;
+        else
+            Xdd(1) = Xdd(1) - sign(Xd(1)) * mu_dyna * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty);
+        end
+    else
+         Xdd(1) = Xdd(1) - sign(Xd(1)) * mu_dyna * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty);
+    end
+    %disp(Xdd')
     % tau_tot : sigma tau_i + tau_theta(1) + r x lambda
-    wd = inv(AM_inertia * inertia_uncertainty - It * num_AMs) * (tau_tot - S(w) * (AM_inertia * inertia_uncertainty - It * num_AMs) * w + disturb(4:6));
-    
+    wd = 0;
+
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         force_tot_mbo = force_tot;
         phi_prev = phi;
@@ -448,6 +468,7 @@ for i = 1:N_sim_tmp
     pitch_hist = [pitch_hist, wrapToPi(pitch)];
     pitch_des_hist = [pitch_des_hist, wrapToPi(pitch_des)];
     phi_hist = [phi_hist, phi];
+    R_hist{i} = R;
    
     e_pitch_hist = [e_pitch_hist, e_pitch];
     e_theta_hist = [e_theta_hist, e_theta];
@@ -496,9 +517,9 @@ for j = 2
     plot(times, w_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     plot(times, w_des_hist(j, 1:i), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
 end
-legend({'$\omega_{y,i}$', '$\omega_{y,i}^{\mathrm{des}}$'}, ...
+legend({'$\omega_y$', '$\omega_y^{\mathrm{des}}$'}, ...
        'Interpreter', 'latex','FontSize', 12);
-title('${\omega_i}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
+title('${\omega}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 %ylim([-1, 1])
 grid on
 
@@ -512,6 +533,8 @@ legend({'$\phi_{e,1}$', '$\phi_{e,1}^{\mathrm{des}}$'}, ...
        'Interpreter', 'latex','FontSize', 12);
 title('${\phi_{e}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
+
+
 %% Error 
 figure('Position',[750 350 600 600]);
 colors = lines(6);
@@ -562,16 +585,14 @@ subplot(3,2,5)
 hold on
 for j = 1:4
     plot(times, delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
-    if j==4 
-        plot(times, disturb_hist(5, :), 'Color', colors(j,:), 'LineWidth', 1.0, 'LineStyle','--');
-    else
-        plot(times, disturb_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0, 'LineStyle','--');
-    end
 end
-legend({'$\hat{\Delta}_x^p$','$\Delta_x^p$',...
-        '$\hat{\Delta}_y^p$','$\Delta_y^p$',...
-        '$\hat{\Delta}_z^p$','$\Delta_z^p$',...
-        '$\hat{\Delta}_y^\omega$','$\Delta_y^\omega$'},'Interpreter','latex','FontSize', 12);
+plot([times(1), times(end)], [mu_st * M_o * 9.81 , mu_st * M_o * 9.81 ], 'k--', 'LineWidth', 1.0);
+plot([times(1), times(end)], [mu_dyna * M_o * 9.81 , mu_dyna * M_o * 9.81 ], 'k--', 'LineWidth', 1.0);
+plot([times(1), times(end)], -[mu_st * M_o * 9.81 , mu_st * M_o * 9.81 ], 'k--', 'LineWidth', 1.0);
+plot([times(1), times(end)], -[mu_dyna * M_o * 9.81 , mu_dyna * M_o * 9.81 ], 'k--', 'LineWidth', 1.0);
+
+legend({'$\hat{\Delta}_{p,x}$','$\hat{\Delta}_{p,y}$', '$\hat{\Delta}_{p,z}$', '$\hat{\Delta}_{\omega,y}$'}, ...
+        'Interpreter','latex','FontSize', 12);
 title('$\hat{\Delta}$', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
@@ -650,11 +671,14 @@ title('$e_{\dot\theta}$', 'Interpreter', 'latex','FontSize', 14)
 grid on
 %% Video
 if show_video
-figure('Position',[600 100 500 500]);
+figure('Position',[600 100 600 500]);
 dN = 0.1 / dt_sim;
-framesPerSecond = 1/dt_sim/dN * video_speed;
+framesPerSecond = 1/dt_sim/dN * 2;
 rate = rateControl(framesPerSecond);
 arrow_len = 0.1;
+
+min_X = min([X_des(:, 1:N_sim_tmp), X_hist], [], 2); % Minimum for each row (x, y, z)
+max_X = max([X_des(:, 1:N_sim_tmp), X_hist], [], 2); % Maximum for each row (x, y, z)
 
 if save_video
     video_filename = '../images/test.avi';
@@ -667,9 +691,12 @@ for i = 1:dN:N_sim_tmp
     clf;
     grid on; axis equal;
     set(gca, 'GridLineWidth', 1.0, 'GridAlpha', 0.3);
-    xlim([X_des(1, i) - (l1+l2)/2*num_AMs*2.0, X_des(1, i) + (l1+l2)/2*num_AMs*2.0 ] )
-    ylim([X_des(3, i) - (l1+l2)/2*num_AMs*2.0, X_des(3, i) + (l1+l2)/2*num_AMs*2.0 ])
+
+    xlim([min_X(1) - (l1+l2)/2*num_AMs*2.0, max_X(1) +  r_o(1) + box_width * 1.5 ] )
+    %ylim([min_X(3) - (l1+l2)/2*num_AMs*2.0, min_X(3) + (l1+l2)/2*num_AMs*2.0 ])
+    ylim([-2.0, 2.0])
     
+
     hold on;
     R = R_hist{i};
     
@@ -678,7 +705,7 @@ for i = 1:dN:N_sim_tmp
         X_quad = X_hist(:, i) + R * r_cj{j};
         R_quad = Ry(phi_hist(j, i));
         dx = force_per_M_hist(j, i) * mass_ams(j) / 9.81 * arrow_len * R_quad(1,3);
-        dz = force_per_M_hist(j, i) * mass_ams(j) / 9.81 * arrow_len * R_quad(3,3);       
+        dz = force_per_M_hist(j, i) * mass_ams(j)  / 9.81 * arrow_len * R_quad(3,3);       
         plot(X_quad(1), X_quad(3), 'o', 'Color', 'b');
         quiver(X_quad(1), X_quad(3), dx, dz, 0, 'r', 'LineWidth', 1.5);
         
@@ -688,11 +715,17 @@ for i = 1:dN:N_sim_tmp
    
     end
 
-    R_des = R_e_des{i};
+    X_object = X_hist(:, i) + R * r_o;
+    plot(X_object(1), X_object(3), 'o', 'Color', 'blue', 'LineWidth', 1.5);
+    cornerX = box_width/2 * [-1, 1, 1, -1, -1] + X_object(1) * ones(1,5);
+    cornerZ = box_height/2 * [-1, -1, 1, 1, -1] + X_object(3) * ones(1,5);
+    plot(cornerX, cornerZ, 'b', 'LineWidth', 1.0);
+
+    R_des = R_e_des{1};
     
     for j = 1:num_AMs
         R_e_des_j = R_des * R_shape{j};
-        X_des_quad = X_des(:, i) + R_des * r_cj{j};      
+        X_des_quad = X_des(:, i) + R_des * r_cj{j};
         plot(X_des_quad(1), X_des_quad(3), 'o', 'Color', 'black', 'LineWidth', 2.0);
 
         X1 = X_des_quad + l1 * R_e_des_j * e_1;
@@ -700,22 +733,20 @@ for i = 1:dN:N_sim_tmp
         plot([X1(1), X2(1)], [X1(3), X2(3)], 'k--', 'LineWidth', 2.0);
     end
 
+    X_object_des = X_des(:, i) + R_des * r_o;
+    plot(X_object_des(1), X_object_des(3), 'o', 'Color', 'black', 'LineWidth', 2.0);
+    cornerX = box_width/2 * [-1, 1, 1, -1, -1] + X_object_des(1) * ones(1,5);
+    cornerZ = box_height/2 * [-1, -1, 1, 1, -1] + X_object_des(3) * ones(1,5);
+    plot(cornerX, cornerZ, 'k--', 'LineWidth', 2);
+        
     % com
     plot(X_hist(1, i), X_hist(3, i), 'o', 'Color', 'b', 'MarkerSize', 10);
     plot(X_des(1, i), X_des(3, i), 'o', 'Color', 'k', 'MarkerSize', 8);
-    
-    % payload
-    X1 = X_hist(:, i) + R * r_cj{1};
-    X1 = X1 + l1 * R * R_shape{1} * e_1;
-    dx = disturb_hist(1, i) / 9.81 * arrow_len;
-    dz = disturb_hist(3, i) / 9.81 * arrow_len;   
-    quiver(X1(1), X1(3), dx, dz, 0, 'g', 'LineWidth', 1.5);
 
     xlabel('X position'); ylabel('Z position');
     title_string = sprintf("time : %.2f sec", times(i));
     title(title_string);
     drawnow
-
     if save_video
         frame = getframe(gcf);
         writeVideo(video, frame);
