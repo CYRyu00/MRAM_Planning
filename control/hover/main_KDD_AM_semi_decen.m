@@ -205,7 +205,7 @@ for i = 1:N_sim_tmp
                 + kp_j * e_p / mj + gravity + delta_hat(:, j) / mj;
         eta = - alpha * mj * nu_ej ...
               - mj * gamma * (e_pd + epsilon * e_p);
-        vec = R' * (eta - mj * Xddd_des + kv_j * e_pdd_hat + kp_j * e_pd + delta_hat(:, j));
+        vec = R' * (eta - mj * Xddd_des + kv_j * e_pdd_hat + kp_j * e_pd + delta_hat(:, j)); % Todo: delta_hatd
         w_xj_des = - vec(2) / force_prev(j);
         w_yj_des = vec(1) / force_prev(j);
         forced = vec(3);
