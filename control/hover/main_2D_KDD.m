@@ -307,7 +307,7 @@ for i = 1:N_sim_tmp
                     + kp_j * e_p / mj - 9.81 * e_3 + delta_hat(1:3, j) / mj;
             eta = - alpha * mj * nu_ej ...
                   - mj * gamma * (e_pd + epsilon * e_p);
-            vec = R_quad' * (eta + mj * Xddd_des_quad(j) - kv_j * e_pdd_hat - kp_j * e_pd - delta_hatd(1:3, j)); % delta_hatd
+            vec = R_quad' * (eta + mj * Xddd_des_quad(:, j) - kv_j * e_pdd_hat - kp_j * e_pd - delta_hatd(1:3, j)); % delta_hatd
             w_xj_des = - vec(2) / lambda_prev(j);
             w_yj_des = vec(1) / lambda_prev(j);
             lambdad = vec(3);

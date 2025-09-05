@@ -2,12 +2,15 @@ function [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_tr
     X_des = []; Xd_des = []; Xdd_des = []; Xddd_des = []; 
     R_e_des = cell(N_sim, 1); w_e_des = []; wd_e_des = [];
 
-    X_prev = X_hover; Xd_prev = zeros(3,1); 
+    X_prev = X_hover; Xd_prev = zeros(3,1); Xdd_prev = zeros(3,1);  
     R_e_prev = rpy2rot(rpy_hover(1), rpy_hover(2), rpy_hover(3));
+    velocity_input = velocity;
+    cnt_x = 0;
     for i = 1:N_sim
         X = X_prev + velocity * dt_sim;
         if abs(X(1)) > maximum_X(1)
-            velocity(1) = velocity(1) * (1 - dt_sim*4);
+            cnt_x = cnt_x + 1;
+            velocity(1) = velocity_input(1) * (0.5 * cos( min(pi, cnt_x * dt_sim/0.5)) + 0.5);
             %X(1) = sign(X(1)) * maximum_X(1);
             %Xd(1) = 0;
         end    
@@ -21,7 +24,18 @@ function [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_tr
         end
         Xd = velocity;
         
-        Xdd = (Xd - Xd_prev) / dt_sim; 
+        if i == 1
+            Xdd = [0; 0; 0];
+        else
+            Xdd = (Xd - Xd_prev) / dt_sim; 
+        end
+        if i < 2
+            Xddd = [0; 0; 0];
+        else
+            Xddd = (Xdd - Xdd_prev) / dt_sim;
+            Xdd_prev = Xdd; 
+        end
+
         X_des = [X_des, X];
         Xd_des = [Xd_des, Xd];
         Xdd_des = [Xdd_des, Xdd];
