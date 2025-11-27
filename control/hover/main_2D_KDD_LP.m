@@ -99,9 +99,11 @@ if num_AMs == 1 % single인 경우는 없는게 나은듯
 end 
 
 tan_max = tan(45 / 180 * pi);
-k_internal_f = 6e1 * num_AMs; %3e1 * num_AMs
-k_internal_tau = 5e1 * num_AMs;% 5e1 * num_AMs
-k_smooth = 3e2;% 1e2 ~
+k_internal_f = 2e0; % 2e0
+k_internal_tau = 1e1 ;% 1e1
+k_smooth1 = 1e-2;% 1e-2
+k_smooth2 = 1e0;% 1e0 % TODO delta_hatd lpf
+
 
 kinematic_error = 1.1; %TODO
 
@@ -122,22 +124,22 @@ w_des_limit = 3.0; % 2 ~ 1
 
 % disturbance
 % payload at EE
-payload = 5;
+payload = 3;
 rising_time = 3;
 mean = 0.0; max_val = 500.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.5;
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0;
 noise = zeros(6, 1);
 disturb_sim = zeros(N_sim, 6);
 
 % Modeling error
-mass_uncertainty = 1.05; 
+mass_uncertainty = 1.00; 
 inertia_uncertainty = 1.00;
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 10 / 100; max_X = 0.05;
-sigma_w = 10 / 100; max_w = 0.1; 
+sigma_X = 0 / 100; max_X = 0.05;
+sigma_w = 0 / 100; max_w = 0.1; 
 
 % Delay
 delay_bs = 0.004 / dt_sim;
@@ -173,14 +175,14 @@ end
 lambda_prev = mass_ams * norm(gravity) * 1.0;
 delta_hat = zeros(4, num_AMs);
 delta_hatd = zeros(4, num_AMs);
-delta_hat_tot = zeros(4, 1);
+f_ext_hat = zeros(4, 1);
 h_0 = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)]; % linear moment
 int_mbo = zeros(4, 1);
 force_tot_mbo = AM_mass * norm(gravity) * e_3;
 tau_tot_mbo = zeros(3, 1);
 lambda_mbo = lambda_prev;
 phi_prev = phi; phid_prev = phid;
-Delta_p_opt = zeros(3, num_AMs); Delta_w_opt = zeros(3, num_AMs);
+delta_prev = zeros(3*num_AMs, 1); delta_pprev = zeros(3*num_AMs, 1);
 
 w_quad_des_prev = zeros(3, num_AMs);
 
@@ -188,11 +190,11 @@ X_hist = []; Xd_hist = []; w_hist = []; wd_hist = []; R_hist = cell(N_sim, 1);
 w_des_hist = []; wd_des_hist = []; thrusts_hist = []; F_hat_hist = [];
 e_p_hist = []; e_d_hist = []; e_w_hist = []; e_psi_hist = [];
 nu_e_hist = []; delta_hat_hist = []; delta_tilde_hist = [];
-force_per_M_hist = []; delta_hat_x_per_M_hist = [];
+force_per_M_hist = []; delta_hat_x_per_M_hist = []; delta_hat_z_per_M_hist = [];
 e_theta_hist = []; e_thetad_hist = [];
 e_pitch_hist = []; e_R_hist = [];
 pitch_hist = []; pitch_des_hist = []; phi_hist = [];
-disturb_hist = []; delta_hat_tot_hist = [];
+disturb_hist = []; f_ext_hat_hist = [];
 internal_f_opt_hist = []; internal_tau_opt_hist = [];
 internal_f_real_hist = []; internal_tau_real_hist = []; 
 internal_f_real_tq_hist = []; internal_tau_real_tq_hist = []; 
@@ -214,6 +216,7 @@ for i = 1:N_sim_tmp
     thrusts = [];
     force_per_M = [];
     delta_hat_x_per_M = [];
+    delta_hat_z_per_M = [];
     
     input_real = zeros(num_AMs*6, 1);
 
@@ -228,10 +231,10 @@ for i = 1:N_sim_tmp
     % MBO
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         h = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)];
-        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + delta_hat_tot) * dt_sim * delay_mbo; 
+        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + f_ext_hat) * dt_sim * delay_mbo; 
         % 1-order LPF
-        delta_hat_tot_sensored = k_mbo * (h - int_mbo - h_0);
-        delta_hat_tot = (dt_lpf * delta_hat_tot + dt_sim * delay_mbo * delta_hat_tot_sensored) / (dt_lpf + dt_sim * delay_mbo);
+        f_ext_hat_sensored = k_mbo * (h - int_mbo - h_0);
+        f_ext_hat = (dt_lpf * f_ext_hat + dt_sim * delay_mbo * f_ext_hat_sensored) / (dt_lpf + dt_sim * delay_mbo);
         
         tau_tot_mbo = zeros(3, 1);
         
@@ -249,9 +252,7 @@ for i = 1:N_sim_tmp
                 Ad(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j}  * S(w) * S(e_1), l1 * R * R_shape{j+1}  * S(w) * S(e_1)];
             end
 
-            A_dagger = - A' * ((A* (M\ A')) \ A) * inv(M);
-            A_dagger_2 = - A' * ((A* (M\ A')) \ Ad);
-            Lambda = ((A* (M\ A')) \ A) * inv(M);
+            A_dagger = ((A* (M\ A')) \ A) * inv(M);
 
             A_f_t = zeros(num_AMs * 3, (num_AMs - 1) * 3);
             A_f_r = zeros(num_AMs * 3, (num_AMs - 1) * 3);
@@ -273,97 +274,101 @@ for i = 1:N_sim_tmp
                 end
             end
 
-            A_u2f = A_f_t(4:end, :)\A_dagger(4 : num_AMs*3, :);
-            A_u2tau = A_tau_r(4:end, :)\A_f_r(4:end, :)*A_u2f + A_tau_r(4:end, :)\ A_dagger((num_AMs+1)*3+1:end, :);
-
-
-            % central feedback
-            e_R_cen = 0.5 * vee(R_e_des{i}' * R - R' * R_e_des{i});
-            e_w_cen = w - R' * R_e_des{i} * w_e_des(:, i);
+  
+            f = [zeros(3*num_AMs, 1); 1; 1; 1];
             
-            Delta_p = MX.sym('Delta_p', 3, num_AMs);  % 3 × num_AMs
-            % Delta_w = MX.sym('Delta_w', 3, num_AMs);  % 1 × num_AMs
-            
-            costs = [];
+            A_eq = zeros(6, 3*num_AMs + 3);
+
             for j = 1:num_AMs
-                cost_j = ( - mass_ams(j) * gravity - Delta_p(:, j))' * (- mass_ams(j) * gravity - Delta_p(:, j));
-                costs = [costs; cost_j];
+                rj = R * r_cj{j};
+                A_eq(1:6, 3*j-2:3*j) = [eye(3,3); S(rj)];
+            end
+            b_eq = [f_ext_hat(1:3); 0; f_ext_hat(4);0]; % f_ext; re x f_ext + tau_ext
+            
+            v = zeros(3*num_AMs, 1);
+            for j = 1:num_AMs
+                v(3*j-2:3*j) = mass_ams(j)* 9.81 * e_3; %TODO feed-back term
             end
             
-            costs_normalized = costs / sqrt(costs' * costs + 1e-6);
-            exp_terms = exp(kappa * costs_normalized);
-            obj = log(sum(exp_terms)) * sqrt(costs' * costs + 1e-6) / kappa;
+            % inf-norm of v - delta
+            A_ineq = [-1 * eye(3*num_AMs), -1 * ones(3*num_AMs, 1), zeros(3*num_AMs, 2) ...
+                      ;eye(3*num_AMs), -1 * ones(3*num_AMs, 1), zeros(3*num_AMs, 2)];
+            b_ineq = [-v; v];
             
-            % TODO
-            input = -[Delta_p(:)];
-            input(1:3) = input(1:3) + delta_hat_tot(1:3);
-            internal_f = A_u2f(:, 1:num_AMs*3) * input;
-            internal_tau = A_u2tau(:, 1:num_AMs*3) * input;
-
-            costs_normalized = internal_f / sqrt(internal_f' * internal_f  + 1e-6);
-            exp_terms = exp(kappa * costs_normalized);
-            obj = obj + k_internal_f * log(sum(exp_terms)) * sqrt(internal_f' * internal_f + 1e-6) / kappa;
-
-            costs_normalized = internal_tau / sqrt(internal_tau' * internal_tau  + 1e-6);
-            exp_terms = exp(kappa * costs_normalized);
-            obj = obj +  k_internal_tau *  log(sum(exp_terms)) * sqrt(internal_tau' * internal_tau + 1e-6) / kappa;
-            
-            action_diff = Delta_p - delta_hat(1:3, :);
-            obj = obj + k_smooth * action_diff(:)' * action_diff(:);
-
-            % Eqaulity and Inequality
-            moment = MX.zeros(1,1); % y-axis moment
-            for j = 1:num_AMs
-                moment = moment + e_2' * cross(r_cj{j}, R' * Delta_p(:,j));
-            end
-            
-            g = [sum(Delta_p, 2); moment];
-            
-            for j = 1:num_AMs
+            % tilting angle constraint
+            A1 = zeros(num_AMs, 3*num_AMs);
+            A2 = zeros(num_AMs, 3*num_AMs);
+            a1 = - e_1' + tan_max * e_3';
+            a2 = e_1' + tan_max * e_3';
+            for j = 1 : num_AMs
                 Rj = R * R_shape{j};
-                feedforward = - mass_ams(j) * gravity - Delta_p(:, j);
-                ineq = [feedforward' * Rj * e_1 - tan_max * feedforward' * Rj * e_3 ; ...
-                        -feedforward' * Rj * e_1 -  tan_max * feedforward' * Rj * e_3];
-                g = [g; ineq];
+                A1(j, 3*j-2:3*j) = a1 * Rj';
+                A2(j, 3*j-2:3*j) = a2 * Rj';
             end
             
-            opt_var = [Delta_p(:)]; 
+            A_ineq = [A_ineq; A1, zeros(num_AMs, 3);...
+                              A2, zeros(num_AMs, 3)];
+            b_ineq = [b_ineq; A1 * v; A2 * v];
             
-            nlp_prob = struct('x', opt_var, 'f', obj, 'g', g);
-            nlp_opts = struct;
-            nlp_opts.ipopt.print_level = 0;
-            nlp_opts.ipopt.tol = 1e-3;
-            %nlp_opts.ipopt.max_iter = max_iter;
-            nlp_opts.ipopt.mu_strategy = 'adaptive';
-            %nlp_opts.ipopt.linear_solver = 'ma27';
-            nlp_opts.ipopt.jacobian_approximation = 'exact';
-            % nlp_opts.ipopt.hessian_approximation = 'limited-memory';
-            nlp_opts.print_time = 0;
+            % inf-norm of internal force % TODO: feed-back
+            K_int_inv = [k_internal_f \ ones((num_AMs-1)*3, 1); k_internal_tau \ ones((num_AMs-1)*3, 1)];
+            r_e = X + R * r_cj{1} + l1 * R * R_shape{1} * e_1;
+            F_ext = [f_ext_hat(1:3); zeros(3*num_AMs -3, 1);
+                     e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
+            F_int0 =  -A_dagger * F_ext; %todo Adqd, Cqd;
+            A_delta = A_dagger(:, 1:3*num_AMs);
             
-            solver = nlpsol('solver', 'ipopt', nlp_prob, nlp_opts);
-            opt_var0 = [Delta_p_opt(:)];
-            LBG = delta_hat_tot + [0;0;0; e_2' * (k_R_cen * e_R_cen + k_w_cen * e_w_cen)];
-            UBG = LBG;
-            LBG = [LBG; -inf * ones(num_AMs*2, 1)];
-            UBG = [UBG; 0 * ones(num_AMs*2, 1)];
-            sol = solver('x0', opt_var0, 'lbg', LBG, 'ubg', UBG);
-    
-            Delta_p_opt = reshape(full(sol.x(1:3*num_AMs)), 3, num_AMs);
-            % Delta_w_opt = reshape(full(sol.x(3*num_AMs+1:end)), 3, num_AMs);
-    
-            delta_hatd = ([Delta_p_opt; zeros(1, num_AMs)] - delta_hat) / dt_sim / delay_mbo;
-            delta_hat = [Delta_p_opt; zeros(1, num_AMs)];
+            A_ineq = [A_ineq; A_delta, zeros(6*(num_AMs-1), 1), -K_int_inv, zeros(6*(num_AMs-1), 1);...
+                              -A_delta, zeros(6*(num_AMs-1), 1), -K_int_inv, zeros(6*(num_AMs-1), 1)];
+            b_ineq = [b_ineq; -F_int0; F_int0];
+            
+            % inf-norm of second derivative
+            K_smooth1_inv = k_smooth1 \ ones(num_AMs*3, 1);
+            
+            A_ineq = [A_ineq; eye(3*num_AMs), zeros(3*num_AMs, 2), -K_smooth1_inv;...
+                              -eye(3*num_AMs), zeros(3*num_AMs, 2), -K_smooth1_inv];
+            ref = delta_prev;
+            b_ineq = [b_ineq; ref; -ref];
 
-            input_opt = -[Delta_p_opt(:); zeros(num_AMs*3,1)];
-            input_opt(1:3) = input_opt(1:3) + delta_hat_tot(1:3);
-            Lambda = Lambda *input_opt;
-            internal_f_opt = A_u2f * input_opt;
-            internal_tau_opt = A_u2tau * input_opt;
-            internal_wrench = [internal_f_opt; internal_tau_opt];
-            % internal_wrench - Lambda
-            if solver.stats.success ~= 1
-                disp(solver.stats.return_status)
+            K_smooth2_inv = k_smooth2 \ ones(num_AMs*3, 1);
+            
+            A_ineq = [A_ineq; eye(3*num_AMs), zeros(3*num_AMs, 2), -K_smooth2_inv;...
+                              -eye(3*num_AMs), zeros(3*num_AMs, 2), -K_smooth2_inv];
+            ref = 2* delta_prev - delta_pprev;
+            b_ineq = [b_ineq; ref; -ref];
+            
+            
+            lb = -inf * ones(3* num_AMs + 3, 1);   
+            ub = inf * ones(3* num_AMs + 3, 1);
+            
+            options = optimoptions('linprog', ...
+                'Algorithm', 'dual-simplex', ...  % 'interior-point', 'simplex', 'dual-simplex' 중 선택
+                'Display', 'off', ...           % 'off', 'final', 'iter' 중 선택
+                'MaxIterations', 100);             % 최대 반복 횟수 제한
+            
+            [sol, fval, exitflag, solver_output] = linprog(f, A_ineq, b_ineq, A_eq, b_eq, lb, ub, options);
+            
+            if exitflag == 1
+                % delta_prev = sol(1:3*num_AMs);
+                delta_pprev = delta_prev;
+                delta_reshape = reshape(sol(1:3*num_AMs), 3, num_AMs);
+                delta_reshape(2,:) = 0; % 2D
+                delta_prev = delta_reshape(:); %2D
+                norms = sol(3*num_AMs+1 : end);
+            else
+                disp(solver_output)
             end
+            
+            delta_hatd = ([delta_reshape; zeros(1, num_AMs)] - delta_hat) / dt_sim / delay_mbo;
+            delta_hat = [delta_reshape; zeros(1, num_AMs)];
+
+            input_opt = -[delta_prev; zeros(num_AMs*3,1)] + F_ext;
+            Lambda = -A_dagger * input_opt;
+            internal_f_opt = Lambda(1:3*num_AMs-3);
+            internal_tau_opt = Lambda(3*num_AMs-2 :end);
+            internal_wrench = Lambda;
+            % internal_wrench - Lambda
+
             %disp(delta_hat)
         end
     end
@@ -481,7 +486,8 @@ for i = 1:N_sim_tmp
         input_real(3*(j+num_AMs) -2:3*(j+num_AMs)) = (tau_j - tau_theta(j)) * e_2;
         thrusts = [thrusts; thrust_j];
         force_per_M = [force_per_M; lambda_j / mj];
-        delta_hat_x_per_M = [delta_hat_x_per_M; delta_hat(3, j) / mj];
+        delta_hat_x_per_M = [delta_hat_x_per_M; delta_hat(1, j) / mj];
+        delta_hat_z_per_M = [delta_hat_x_per_M; delta_hat(3, j) / mj];
     end
     % generate disturbance
     seed_number = i;
@@ -526,6 +532,7 @@ for i = 1:N_sim_tmp
     thrusts_hist = [thrusts_hist, thrusts];
     force_per_M_hist = [force_per_M_hist, force_per_M];
     delta_hat_x_per_M_hist = [delta_hat_x_per_M_hist, delta_hat_x_per_M];
+    delta_hat_z_per_M_hist = [delta_hat_z_per_M_hist, delta_hat_z_per_M];
     
     % totoal
     e_p = X - X_des(:, i); 
@@ -540,36 +547,36 @@ for i = 1:N_sim_tmp
     nu_e_hist = [nu_e_hist, nu_ej];
     delta_hat_hist = [delta_hat_hist, delta_hat(:, j)];
     delta_tilde_hist = [delta_tilde_hist, mj / AM_mass * disturb(1:3) - delta_hat(1:3, j)];
-    delta_hat_tot_hist = [delta_hat_tot_hist, delta_hat_tot];
+    f_ext_hat_hist = [f_ext_hat_hist, f_ext_hat];
     disturb_hist = [disturb_hist, disturb];
 
     internal_f_opt_hist = [internal_f_opt_hist, internal_f_opt]; 
     internal_tau_opt_hist = [internal_tau_opt_hist, internal_tau_opt];
 
-    internal_qd = A_dagger_2 * [zeros(num_AMs*3, 1); repmat(w,[num_AMs,1])];
-    internal_qd_f = A_f_t(4:end, :) * internal_qd(4 : num_AMs*3);
-    internal_qd_tau = A_tau_r(4:end, :) \ ( - internal_qd_f +  A_tau_r(4:end, :) * internal_qd( (num_AMs+1)*3+1 : end) ) ;
+    % internal_qd = A_dagger_2 * [zeros(num_AMs*3, 1); repmat(w,[num_AMs,1])];
+    % internal_qd_f = A_f_t(4:end, :) * internal_qd(4 : num_AMs*3);
+    % internal_qd_tau = A_tau_r(4:end, :) \ ( - internal_qd_f +  A_tau_r(4:end, :) * internal_qd( (num_AMs+1)*3+1 : end) ) ;
 
     % A_u2f = A_f_t(4:end, :)\A_dagger(4 : num_AMs*3, :);
     % A_u2tau = A_tau_r(4:end, :)\A_f_r(4:end, :)*A_u2f + A_tau_r(4:end, :)\ A_dagger((num_AMs+1)*3+1:end, :);
 
   
-    input_real(1:3) = input_real(1:3) + disturb(1:3);
-    input_real(1 + 3*num_AMs : 3 + 3*num_AMs) = input_real(1 + 3*num_AMs : 3 + 3*num_AMs) + disturb(4:6) - S(X1 - X) * disturb(1:3);
-    internal_f_real = A_u2f * input_real + internal_qd_f;
-    internal_tau_real = A_u2tau * input_real + internal_qd_tau;
+    % input_real(1:3) = input_real(1:3) + disturb(1:3);
+    % input_real(1 + 3*num_AMs : 3 + 3*num_AMs) = input_real(1 + 3*num_AMs : 3 + 3*num_AMs) + disturb(4:6) - S(X1 - X) * disturb(1:3);
+    % internal_f_real = A_u2f * input_real + internal_qd_f;
+    % internal_tau_real = A_u2tau * input_real + internal_qd_tau;
     
 
-    internal_f_real_hist = [internal_f_real_hist, internal_f_real]; 
-    internal_tau_real_hist = [internal_tau_real_hist, internal_tau_real];
+    % internal_f_real_hist = [internal_f_real_hist, internal_f_real]; 
+    % internal_tau_real_hist = [internal_tau_real_hist, internal_tau_real];
 
-    internal_f_real_tq = A_u2f(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
-    internal_tau_real_tq = A_u2tau(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
-    internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_f_real_tq]; 
-    internal_tau_real_tq_hist = [internal_tau_real_tq_hist, internal_tau_real_tq];
-
-    internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd_f]; 
-    internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd_tau];
+    % internal_f_real_tq = A_u2f(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
+    % internal_tau_real_tq = A_u2tau(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
+    % internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_f_real_tq]; 
+    % internal_tau_real_tq_hist = [internal_tau_real_tq_hist, internal_tau_real_tq];
+    % 
+    % internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd_f]; 
+    % internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd_tau];
 
 
 
@@ -587,7 +594,7 @@ for i = 1:N_sim_tmp
     %disp(force_tot')
     %disp(tau)
     %disp(tau_tot_mbo')
-    %disp(delta_hat_tot')
+    %disp(f_ext_hat')
 end
 toc
 %% State plot
@@ -689,7 +696,7 @@ grid on
 subplot(3,2,5)
 hold on
 for j = 1:4
-    plot(times, delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+    plot(times, f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     if j==4 
         plot(times, disturb_hist(5, :), 'Color', colors(j,:), 'LineWidth', 1.0, 'LineStyle','--');
     else
@@ -708,9 +715,9 @@ subplot(3,2,6)
 hold on
 for j = 1:4
     if j==4 
-        plot(times, disturb_hist(5, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(5, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     else
-        plot(times, disturb_hist(j, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(j, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     end
 end
 legend({'$\tilde{\Delta}_x$',...
@@ -724,7 +731,7 @@ grid on
 figure('Position',[1350 550 500 400]);
 
 % 7. thrusts
-subplot(3,1,1)
+subplot(4,1,1)
 hold on
 plot(times, thrusts_hist, 'LineWidth', 1.0);
 %ylim([ -thrust_limit, thrust_limit] )
@@ -733,17 +740,26 @@ grid on
 
 
 legend_entries = arrayfun(@(x) sprintf('%d', x), 1:num_AMs, 'UniformOutput', false);
-subplot(3,1,2)
+subplot(4,1,2)
 plot(times, force_per_M_hist)
 title('$\frac{\lambda_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
 legend(legend_entries)
 grid on
 
-subplot(3,1,3)
+subplot(4,1,3)
 plot(times, delta_hat_x_per_M_hist)
-title('$\frac{\Delta_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
+title('$\frac{\Delta_{p,i}}{M_i} x $', 'Interpreter', 'latex','FontSize', 14)
 legend(legend_entries)
 grid on
+
+subplot(4,1,4)
+plot(times, delta_hat_z_per_M_hist)
+title('$\frac{\Delta_{p,i}}{M_i} z $', 'Interpreter', 'latex','FontSize', 14)
+legend(legend_entries)
+grid on
+
+
+
 %% End effector Error 
 figure('Position',[1350 50 500 450]);
 colors = lines(6);
@@ -802,63 +818,64 @@ ylabel("[Nm]")
 title('Internal torques(Optimized)', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
-subplot(4,2,3)
-hold on
-for j = 1:num_AMs-1
-    % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
-    plot(times, internal_f_real_hist(3*j-2, :), 'LineWidth', 1.0);
-    plot(times, internal_f_real_hist(3*j, :), 'LineWidth', 1.0);
-end
-ylabel("[N]")
-title('Internal forces(Real)', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-subplot(4,2,4)
-hold on
-for j = 1:num_AMs-1
-    plot(times, internal_tau_real_hist(3*j-1, :), 'LineWidth', 1.0);
-end
-ylabel("[Nm]")
-title('Internal torques(Real)', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-subplot(4,2,5)
-hold on
-for j = 1:num_AMs-1
-    % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
-    plot(times, internal_f_real_tq_hist(3*j-2, :), 'LineWidth', 1.0);
-    plot(times, internal_f_real_tq_hist(3*j, :), 'LineWidth', 1.0);
-end
-ylabel("[N]")
-title('Internal forces(by torque)', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-subplot(4,2,6)
-hold on
-for j = 1:num_AMs-1
-    plot(times, internal_tau_real_tq_hist(3*j-1, :), 'LineWidth', 1.0);
-end
-ylabel("[Nm]")
-title('Internal torques(by torque)', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-subplot(4,2,7)
-hold on
-for j = 1:num_AMs-1
-    plot(times, internal_f_real_qd_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
-end
-ylabel("[N]")
-title('Internal forces(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-subplot(4,2,8)
-hold on
-for j = 1:num_AMs-1
-    plot(times, internal_tau_real_qd_hist(3*j-1, :), 'LineWidth', 1.0);
-end
-ylabel("[Nm]")
-title('Internal torques(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
-grid on
+% 
+% subplot(4,2,3)
+% hold on
+% for j = 1:num_AMs-1
+%     % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_real_hist(3*j-2, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_real_hist(3*j, :), 'LineWidth', 1.0);
+% end
+% ylabel("[N]")
+% title('Internal forces(Real)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% subplot(4,2,4)
+% hold on
+% for j = 1:num_AMs-1
+%     plot(times, internal_tau_real_hist(3*j-1, :), 'LineWidth', 1.0);
+% end
+% ylabel("[Nm]")
+% title('Internal torques(Real)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% subplot(4,2,5)
+% hold on
+% for j = 1:num_AMs-1
+%     % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_real_tq_hist(3*j-2, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_real_tq_hist(3*j, :), 'LineWidth', 1.0);
+% end
+% ylabel("[N]")
+% title('Internal forces(by torque)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% subplot(4,2,6)
+% hold on
+% for j = 1:num_AMs-1
+%     plot(times, internal_tau_real_tq_hist(3*j-1, :), 'LineWidth', 1.0);
+% end
+% ylabel("[Nm]")
+% title('Internal torques(by torque)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% subplot(4,2,7)
+% hold on
+% for j = 1:num_AMs-1
+%     plot(times, internal_f_real_qd_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+% end
+% ylabel("[N]")
+% title('Internal forces(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% subplot(4,2,8)
+% hold on
+% for j = 1:num_AMs-1
+%     plot(times, internal_tau_real_qd_hist(3*j-1, :), 'LineWidth', 1.0);
+% end
+% ylabel("[Nm]")
+% title('Internal torques(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
 
 
 %% Video
