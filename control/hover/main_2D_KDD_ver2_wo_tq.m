@@ -99,8 +99,8 @@ if num_AMs == 1 % single인 경우는 없는게 나은듯
 end 
 
 tan_max = tan(45 / 180 * pi);
-k_internal_f = 6e1 * num_AMs; %3e1 * num_AMs
-k_internal_tau = 5e1 * num_AMs;% 5e1 * num_AMs
+k_internal_f = 1e0 * num_AMs; %3e1 * num_AMs
+k_internal_tau = 5e2 * num_AMs;% 5e1 * num_AMs
 k_smooth = 3e2;% 1e2 ~
 
 kinematic_error = 1.1; %TODO
@@ -113,7 +113,7 @@ gamma = alpha * 1.0; % alpha * 1.0
 % Simulation Parmeters
 N_sim_tmp = 5000;
 show_video = true;
-save_video = true;
+save_video = false;
 video_speed = 1.0;
 
 % Thrust limit and w_des limit
@@ -125,19 +125,19 @@ w_des_limit = 3.0; % 2 ~ 1
 payload = 5;
 rising_time = 3;
 mean = 0.0; max_val = 500.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.5;
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0;
 noise = zeros(6, 1);
 disturb_sim = zeros(N_sim, 6);
 
 % Modeling error
-mass_uncertainty = 1.05; 
+mass_uncertainty = 1.00; 
 inertia_uncertainty = 1.00;
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 10 / 100; max_X = 0.05;
-sigma_w = 10 / 100; max_w = 0.1; 
+sigma_X = 0 / 100; max_X = 0.05;
+sigma_w = 0 / 100; max_w = 0.1; 
 
 % Delay
 delay_bs = 0.004 / dt_sim;
@@ -368,8 +368,8 @@ for i = 1:N_sim_tmp
         end
     end
 
-    for j = num_AMs:-1:1
-    %for j = 1:num_AMs
+    % for j = num_AMs:-1:1
+    for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};

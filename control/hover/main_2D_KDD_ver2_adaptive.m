@@ -32,7 +32,8 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-shape_pitch =[0 -10 -20 -10 0 0 10];
+% shape_pitch =[0 -10 -20 -10 0 0 10];
+shape_pitch =[0 0 0 0 0 0 0];
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
 end
@@ -107,9 +108,9 @@ gamma = alpha * 1.0; % alpha * 1.0
 beta = 40;
 
 % Simulation Parmeters
-N_sim_tmp = 3000;
+N_sim_tmp = 5000;
 show_video = true;
-save_video = false;
+save_video = true;
 video_speed = 1.0;
 
 % Thrust limit and w_des limit
@@ -118,23 +119,23 @@ w_des_limit = 3.0; % 2 ~ 1
 
 % disturbance
 % payload at EE
-payload = 5; 
+payload = 5;
 rising_time = 3;
 mean = 0.0; max_val = 500.0;
-sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.5;
+sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0;
 noise = zeros(6, 1);
 disturb_sim = zeros(N_sim, 6);
 rng(0)
 
 % Modeling error
-mass_uncertainty = 1.05; 
+mass_uncertainty = 1.00; 
 inertia_uncertainty = 1.00;
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);
 w_error = zeros(3, num_AMs);
-sigma_X = 10 / 100; max_X = 0.05;
-sigma_w = 10 / 100; max_w = 0.1; 
+sigma_X = 0 / 100; max_X = 0.05;
+sigma_w = 0 / 100; max_w = 0.1; 
 
 % Delay
 delay_bs = 0.004 / dt_sim;
@@ -273,8 +274,8 @@ for i = 1:N_sim_tmp
 
     end
 
-    for j = num_AMs:-1:1
-    %for j = 1:num_AMs
+    % for j = num_AMs:-1:1
+    for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};
@@ -631,21 +632,24 @@ title('$\tilde{\Delta}$', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
 %% force/disturbance
-figure('Position',[1350 550 500 400]);
+figure('Position',[1350 550 400 400]);
 
 % 7. thrusts
 subplot(3,1,1)
 hold on
 plot(times, thrusts_hist, 'LineWidth', 1.0);
-%ylim([ -thrust_limit, thrust_limit] )
+ylabel("[N]")
+ylim([ 0, thrust_limit*1] )
 title('Thrusts', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
 
 legend_entries = arrayfun(@(x) sprintf('%d', x), 1:num_AMs, 'UniformOutput', false);
 subplot(3,1,2)
-plot(times, force_per_M_hist)
-title('$\frac{\lambda_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
+plot(times, force_per_M_hist * mass_ams(1))
+title('$\lambda_{i}$', 'Interpreter', 'latex','FontSize', 14)
+ylabel("[N]")
+ylim([ 0, thrust_limit*4] )
 legend(legend_entries)
 grid on
 

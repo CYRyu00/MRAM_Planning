@@ -75,9 +75,9 @@ kv_M = diag([kv_M, kv_M, kv_z]);
 kw_I = 10; % 10 or 20 or 100
 
 % servo moter
-kp_servo = 0.01; % 0.1 / 0.01
-kd_servo = 0.1; % 1.0 / 0.1 / 0.03
-damp_servo = 0.05; % 0.05
+kp_servo = 3e-1; % 0.1 / 0.01
+kd_servo = 3e0; % 1.0 / 0.1 / 0.03
+damp_servo = 1e0; % 0.05
 
 % endeffector control
 damped = 0.0; % 0.3
@@ -90,19 +90,19 @@ dt_lpf = 0.2;
 % optimization
 do_optim = true;
 kappa = 30;  % 30
-k_optim = 1e5; % 클수록 토크 적게 씀 -> 안정적
+k_optim = 1e2; % 클수록 토크 적게 씀 -> 안정적
 
 k_R_cen = 00.0; % 10 ~ 30
 k_w_cen = 0.0; % 5
 if num_AMs == 1 % single인 경우는 없는게 나은듯
-    k_R_cen = 0.0;
+    k_R_cen = 0.0; 
     k_w_cen = 0.0;
 end 
 
 tan_max = tan(45 / 180 * pi);
 k_internal_f = 1e0; % 1e0 ~
 k_internal_tau = 5e3;% 1e3 ~ 1e4
-k_smooth = 5e2;% 1e2 ~
+k_smooth = 5e3;% 1e2 ~
 
 % Backstepping gain
 epsilon = kv_M(1, 1) * 0.3; % kv_M(1, 1) * 0.7
@@ -110,7 +110,7 @@ alpha = 4; % 4 or 10
 gamma = alpha * 1.0; % alpha * 1.0 
 
 % Simulation Parmeters
-N_sim_tmp = 5000;
+N_sim_tmp = 10000;
 show_video = true;
 save_video = false;
 video_speed = 1.0;
@@ -121,7 +121,7 @@ w_des_limit = 5.0; % 2 ~ 10
 
 % disturbance
 % payload at EE
-payload = 1; moment_arm = 1.0;
+payload = 0.3; moment_arm = 1.0;
 disturb_final = payload * 9.81 *[0.0; 0.0; -1.0; 0.0; norm(r_cj{1}) * moment_arm ; 0.0]; % force; moment
 rising_time = 3;
 mean = 0.0; max_val = 500.0;
@@ -345,7 +345,7 @@ for i = 1:N_sim_tmp
             Delta_w_opt = reshape(full(sol.x(3*num_AMs+1:end)), 3, num_AMs);
     
             delta_hatd = ([Delta_p_opt; Delta_w_opt(2, :)] - delta_hat) / dt_sim / delay_mbo;
-            delta_hat = [Delta_p_opt; Delta_w_opt(2, :)];
+            delta_hat = [Delta_p_opt(1,:); zeros(1, num_AMs); Delta_p_opt(3,:) ; Delta_w_opt(2, :)];
 
             input_opt = -[Delta_p_opt(:); Delta_w_opt(:)];
             internal_f_opt = A_u2f * input_opt;

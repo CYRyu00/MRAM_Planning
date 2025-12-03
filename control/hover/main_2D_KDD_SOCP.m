@@ -1,6 +1,5 @@
-addpath("../dynamics", "../functions", "../../params", "../../../casadi-3.6.7-windows64-matlab2018b" )
+addpath("../dynamics", "../functions", "../../params" )
 clear; close all
-import casadi.*
 params = define_params_ver2();
 %mq = params{1}; Iq = params{2}; 
 mu = params{3}; r = params{4}; d = params{5};
@@ -32,11 +31,14 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-shape_pitch =[0 -10 -20 -10 0 0 10];
+% shape_pitch =[0 -10 -20 -10 0 0 10];
+% shape_pitch =[0 -10 -10 10 -10 -10 10];
+shape_pitch =[0 0 0 0 0 0 0];
+
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
 end
-l1 = 0.35; l2 = 0.3; % ca = 0.24
+l1 = 0.35; l2 = 0.35; % ca = 0.24
 
 AM_mass = sum(mass_ams);
 for j = 1:num_AMs
@@ -104,17 +106,19 @@ if num_AMs == 1 % single인 경우는 없는게 나은듯
 end 
 
 tan_max = tan(45 / 180 * pi);
-k_internal_f = 1e1; % 1e0 ~, might be depend on external wrench
-k_internal_tau = 1e3 ;% 1e1 ~
-k_smooth1 = 1e0;% 1e0
+k_internal_f = 1e0; % 1e0 ~, might be depend on external wrench
+k_internal_tau = 3e0;% 1e1 ~
+k_smooth1 = 1e-2;% 1e-2 ~1e0
 dt_lpf_delta = 0.01;
+
+
 
 kinematic_error = 1.1; %TODO
 
 % Simulation Parmeters
-N_sim_tmp = 10000;
+N_sim_tmp = 5000;
 show_video = true;
-save_video = true;
+save_video = false;
 video_speed = 1.0;
 
 % Thrust limit and w_des limit
@@ -252,39 +256,21 @@ for i = 1:N_sim_tmp
             end
 
             A_dagger = ((A* (M\ A')) \ A) * inv(M);
-
-            A_f_t = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-            A_f_r = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-            A_tau_r = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-            for j = 1 : num_AMs % f2, f3, f4 ...
-                Rj = R * R_shape{j};
-                if j == 1
-                    A_f_t(3*j-2:3*j, 3*j-2:3*j) = -eye(3);
-                    A_f_r(3*j-2:3*j, 3*j-2:3*j) = -l2*S(Rj*e_1);
-                    A_tau_r(3*j-2:3*j, 3*j-2:3*j) = -eye(3);
-                elseif j == num_AMs
-                    A_f_t(3*j-2:3*j, 3*j-5:3*j-3) = eye(3);
-                    A_f_r(3*j-2:3*j, 3*j-5:3*j-3) = -l1*S(Rj*e_1);
-                    A_tau_r(3*j-2:3*j, 3*j-5:3*j-3) = eye(3);
-                else
-                    A_f_t(3*j-2:3*j, 3*j-5:3*j) = [eye(3), -eye(3)];
-                    A_f_r(3*j-2:3*j, 3*j-5:3*j) = [-l1*S(Rj*e_1), -l2*S(Rj*e_1)];
-                    A_tau_r(3*j-2:3*j, 3*j-5:3*j) = [eye(3), -eye(3)];
-                end
-            end
             
             % SOCP
             f = [zeros(3*num_AMs, 1); 1; 1; 1];
             
             % External wrench compensation
             A_eq = zeros(6, 3*num_AMs + 3);
+            r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
             for j = 1:num_AMs
-                rj = R * r_cj{j};
+                rj = R * r_cj{j} - r_e;
                 A_eq(1:6, 3*j-2:3*j) = [eye(3,3); S(rj)];
             end
-            b_eq = [f_ext_hat(1:3); 0; f_ext_hat(4);0]; % f_ext; re x f_ext + tau_ext
+            b_eq = [f_ext_hat(1:3); e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3)]; % w.r.t ee 
+            % b_eq = [f_ext_hat(1:3); 0; f_ext_hat(4);0]; % f_ext; re x f_ext + tau_ext  e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3)
             
-            % Each module's dec
+            % Each module's decentralized input
             v = zeros(3*num_AMs, 1);
             feedback = zeros(3*num_AMs, 1);
             for j = 1:num_AMs
@@ -331,14 +317,14 @@ for i = 1:N_sim_tmp
                       A2, zeros(num_AMs, 3)];
             b_ineq = [A1 * v; A2 * v];
             
-            % inf-norm of internal force % TODO: feed-back
+            % inf-norm of internal force % TODO: torque check
             K_int_inv = [k_internal_f \ ones((num_AMs-1)*3, 1); k_internal_tau \ ones((num_AMs-1)*3, 1)];
-            r_e = X + R * r_cj{1} + l1 * R * R_shape{1} * e_1;
+            r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
             F_ext = [f_ext_hat(1:3); zeros(3*num_AMs -3, 1);
                      e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
             qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
             Cqd = zeros(6*num_AMs) * qd;
-            F_int0 =  A_dagger *([feedback; zeros(3*num_AMs, 1)] - F_ext + Cqd) - ((A* (M\ A')) \ Ad) * qd; %todo Cqd;
+            F_int0 = A_dagger *([v; zeros(3*num_AMs, 1)] - F_ext + Cqd) - ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
             A_delta = A_dagger(:, 1:3*num_AMs);
             
             A_ineq = [A_ineq; A_delta, zeros(6*(num_AMs-1), 1), -K_int_inv, zeros(6*(num_AMs-1), 1);...
@@ -375,14 +361,14 @@ for i = 1:N_sim_tmp
             delta_hatd = (dt_lpf_delta * delta_hatd + dt_sim * delay_mbo *delta_hatd_computed) / (dt_lpf + dt_sim * delay_mbo);
             delta_hat = [delta_reshape; zeros(1, num_AMs)];
 
-            internal_wrench = A_delta * sol(1:3*num_AMs) + F_int0;
+            internal_wrench = A_delta *  delta_prev + F_int0;
             internal_f_opt = internal_wrench(1:3*num_AMs-3);
             internal_tau_opt = internal_wrench(3*num_AMs-2 :end);
         end
     end
 
-    for j = num_AMs:-1:1
-    %for j = 1:num_AMs
+    % for j = num_AMs:-1:1
+    for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};
@@ -872,7 +858,7 @@ grid on
 
 %% Video
 if show_video
-figure('Position',[600 100 500 500]);
+figure('Position',[500 100 500 500]);
 dN = 0.1 / dt_sim;
 framesPerSecond = 1/dt_sim/dN * video_speed;
 rate = rateControl(framesPerSecond);
@@ -901,7 +887,7 @@ for i = 1:dN:N_sim_tmp
         X_quad = X_hist(:, i) + R * r_cj{j};
         R_quad = Ry(phi_hist(j, i));
         dx = force_per_M_hist(j, i) * mass_ams(j) / 9.81 * arrow_len * R_quad(1,3);
-        dz = force_per_M_hist(j, i) * mass_ams(j) / 9.81 * arrow_len * R_quad(3,3);       
+        dz = (force_per_M_hist(j, i) - 0 )* mass_ams(j) / 9.81 * arrow_len * R_quad(3,3);       
         plot(X_quad(1), X_quad(3), 'o', 'Color', 'b');
         quiver(X_quad(1), X_quad(3), dx, dz, 0, 'r', 'LineWidth', 1.5);
         
