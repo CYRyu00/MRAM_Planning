@@ -171,7 +171,7 @@ end
 lambda_prev = mass_ams * norm(gravity) * 1.0;
 delta_hat = zeros(4, num_AMs);
 delta_hatd = zeros(4, num_AMs);
-delta_hat_tot = zeros(4, 1);
+f_ext_hat = zeros(4, 1);
 h_0 = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)]; % linear moment
 int_mbo = zeros(4, 1);
 force_tot_mbo = AM_mass * norm(gravity) * e_3;
@@ -190,7 +190,7 @@ force_per_M_hist = []; delta_hat_x_per_M_hist = [];
 e_theta_hist = []; e_thetad_hist = [];
 e_pitch_hist = []; e_R_hist = [];
 pitch_hist = []; pitch_des_hist = []; phi_hist = [];
-disturb_hist = []; delta_hat_tot_hist = [];
+disturb_hist = []; f_ext_hat_hist = [];
 internal_f_opt_hist = []; internal_tau_opt_hist = [];
 internal_f_real_hist = []; internal_tau_real_hist = []; 
 internal_f_real_tq_hist = []; internal_tau_real_tq_hist = []; 
@@ -226,10 +226,10 @@ for i = 1:N_sim_tmp
     % MBO
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         h = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)];
-        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + delta_hat_tot) * dt_sim * delay_mbo; 
+        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + f_ext_hat) * dt_sim * delay_mbo; 
         % 1-order LPF
-        delta_hat_tot_sensored = k_mbo * (h - int_mbo - h_0);
-        delta_hat_tot = (dt_lpf * delta_hat_tot + dt_sim * delay_mbo * delta_hat_tot_sensored) / (dt_lpf + dt_sim * delay_mbo);
+        f_ext_hat_sensored = k_mbo * (h - int_mbo - h_0);
+        f_ext_hat = (dt_lpf * f_ext_hat + dt_sim * delay_mbo * f_ext_hat_sensored) / (dt_lpf + dt_sim * delay_mbo);
         
         tau_tot_mbo = zeros(3, 1);
 
@@ -245,32 +245,7 @@ for i = 1:N_sim_tmp
             A(3*(j+num_AMs-1)-2: 3*(j+num_AMs-1), 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [eye(3), -eye(3)];
             Ad(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j}  * S(w) * S(e_1), l1 * R * R_shape{j+1}  * S(w) * S(e_1)];
         end
-
-        A_dagger = - A' * ((A* (M\ A')) \ A) * inv(M);
-        A_dagger_2 = - A' * ((A* (M\ A')) \ Ad);
-
-        A_f_t = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-        A_f_r = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-        A_tau_r = zeros(num_AMs * 3, (num_AMs - 1) * 3);
-        for j = 1 : num_AMs % f2, f3, f4 ...
-            Rj = R * R_shape{j};
-            if j == 1
-                A_f_t(3*j-2:3*j, 3*j-2:3*j) = -eye(3);
-                A_f_r(3*j-2:3*j, 3*j-2:3*j) = -l2*S(Rj*e_1);
-                A_tau_r(3*j-2:3*j, 3*j-2:3*j) = -eye(3);
-            elseif j == num_AMs
-                A_f_t(3*j-2:3*j, 3*j-5:3*j-3) = eye(3);
-                A_f_r(3*j-2:3*j, 3*j-5:3*j-3) = l1*S(Rj*e_1);
-                A_tau_r(3*j-2:3*j, 3*j-5:3*j-3) = eye(3);
-            else
-                A_f_t(3*j-2:3*j, 3*j-5:3*j) = [eye(3), -eye(3)];
-                A_f_r(3*j-2:3*j, 3*j-5:3*j) = [l1*S(Rj*e_1), -l2*S(Rj*e_1)];
-                A_tau_r(3*j-2:3*j, 3*j-5:3*j) = [eye(3), -eye(3)];
-            end
-        end
-
-        A_u2f = A_f_t(4:end, :)\A_dagger(4 : num_AMs*3, :);
-        A_u2tau = -A_tau_r(4:end, :)\A_f_r(4:end, :)*A_u2f + A_tau_r(4:end, :)\ A_dagger((num_AMs+1)*3+1:end, :);
+        A_dagger = ((A* (M\ A')) \ A) * inv(M);
 
     end
 
@@ -451,38 +426,8 @@ for i = 1:N_sim_tmp
     nu_e_hist = [nu_e_hist, nu_ej];
     delta_hat_hist = [delta_hat_hist, delta_hat(:, j)];
     delta_tilde_hist = [delta_tilde_hist, mj / AM_mass * disturb(1:3) - delta_hat(1:3, j)];
-    delta_hat_tot_hist = [delta_hat_tot_hist, delta_hat_tot];
+    f_ext_hat_hist = [f_ext_hat_hist, f_ext_hat];
     disturb_hist = [disturb_hist, disturb];
-
-    % internal_f_opt_hist = [internal_f_opt_hist, internal_f_opt]; 
-    % internal_tau_opt_hist = [internal_tau_opt_hist, internal_tau_opt];
-
-    internal_qd = A_dagger_2 * [zeros(num_AMs*3, 1); repmat(w,[num_AMs,1])];
-    internal_qd_f = A_f_t(4:end, :) * internal_qd(4 : num_AMs*3);
-    internal_qd_tau = A_tau_r(4:end, :) \ ( - internal_qd_f +  A_tau_r(4:end, :) * internal_qd( (num_AMs+1)*3+1 : end) ) ;
-
-    % A_u2f = A_f_t(4:end, :)\A_dagger(4 : num_AMs*3, :);
-    % A_u2tau = A_tau_r(4:end, :)\A_f_r(4:end, :)*A_u2f + A_tau_r(4:end, :)\ A_dagger((num_AMs+1)*3+1:end, :);
-
-  
-    input_real(1:3) = input_real(1:3) + disturb(1:3);
-    input_real(1 + 3*num_AMs : 3 + 3*num_AMs) = input_real(1 + 3*num_AMs : 3 + 3*num_AMs) + disturb(4:6) - S(X1 - X) * disturb(1:3);
-    internal_f_real = A_u2f * input_real + internal_qd_f;
-    internal_tau_real = A_u2tau * input_real + internal_qd_tau;
-    
-
-    internal_f_real_hist = [internal_f_real_hist, internal_f_real]; 
-    internal_tau_real_hist = [internal_tau_real_hist, internal_tau_real];
-
-    internal_f_real_tq = A_u2f(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
-    internal_tau_real_tq = A_u2tau(:, num_AMs*3+1:end) * input_real(num_AMs*3+1:end);
-    internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_f_real_tq]; 
-    internal_tau_real_tq_hist = [internal_tau_real_tq_hist, internal_tau_real_tq];
-
-    internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd_f]; 
-    internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd_tau];
-
-
 
     pitch_hist = [pitch_hist, wrapToPi(pitch)];
     pitch_des_hist = [pitch_des_hist, wrapToPi(pitch_des)];
@@ -498,7 +443,26 @@ for i = 1:N_sim_tmp
     %disp(force_tot')
     %disp(tau)
     %disp(tau_tot_mbo')
-    %disp(delta_hat_tot')
+    %disp(f_ext_hat')
+
+    r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
+    F_ext = [f_ext_hat(1:3); zeros(3*num_AMs -3, 1);
+    e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
+    qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
+    Cqd = zeros(6*num_AMs) * qd;
+
+    internal_qd = - ((A* (M\ A')) \ Ad) * qd;
+    internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd(1:3*(num_AMs-1))]; 
+    internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd(3*(num_AMs-1)+1:end)];
+    
+    internal_tq = A_dagger * [zeros(3*num_AMs, 1); input_real(3*num_AMs+1:end)];
+    internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_tq(1:3*(num_AMs-1))]; 
+    internal_tau_real_tq_hist = [internal_tau_real_tq_hist,  internal_tq(3*(num_AMs-1)+1:end)];
+
+    internal_real = A_dagger * (-input_real - F_ext - Cqd) + internal_qd;
+    internal_f_real_hist = [internal_f_real_hist, internal_real(1:3*(num_AMs-1))]; 
+    internal_tau_real_hist = [internal_tau_real_hist, internal_real(3*(num_AMs-1) + 1:end)];
+   
 end
 toc
 %% State plot
@@ -600,7 +564,7 @@ grid on
 subplot(3,2,5)
 hold on
 for j = 1:4
-    plot(times, delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+    plot(times, f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     if j==4 
         plot(times, disturb_hist(5, :), 'Color', colors(j,:), 'LineWidth', 1.0, 'LineStyle','--');
     else
@@ -619,9 +583,9 @@ subplot(3,2,6)
 hold on
 for j = 1:4
     if j==4 
-        plot(times, disturb_hist(5, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(5, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     else
-        plot(times, disturb_hist(j, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(j, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     end
 end
 legend({'$\tilde{\Delta}_x$',...

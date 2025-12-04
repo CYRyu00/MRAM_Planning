@@ -31,14 +31,14 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-% shape_pitch =[0 -10 -20 -10 0 0 10];
+shape_pitch =[0 -10 -20 -10 0 0 10];
 % shape_pitch =[0 -10 -10 10 -10 -10 10];
-shape_pitch =[0 0 0 0 0 0 0];
+% shape_pitch =[0 0 0 0 0 0 0];
 
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
 end
-l1 = 0.35; l2 = 0.35; % ca = 0.24
+l1 = 0.35; l2 = 0.30; % ca = 0.24
 
 AM_mass = sum(mass_ams);
 for j = 1:num_AMs
@@ -95,26 +95,15 @@ k_mbo = diag([1.0 1.0 1.0 1.0]) * 3e0; % 3e0
 dt_lpf = 0.2;
 
 % optimization
-do_optim = true;
-kappa = 30;  % 30
-
-k_R_cen = 00.0; % 10 ~ 30 -> 크면 internal for
-k_w_cen = 0.0; % 5
-if num_AMs == 1 % single인 경우는 없는게 나은듯
-    k_R_cen = 0.0;
-    k_w_cen = 0.0;
-end 
-
 tan_max = tan(45 / 180 * pi);
 % k_internal_f = 1e0; % 1e0 ~, might be depend on external wrench
 % k_internal_tau = 3e0;% 1e1 ~
 k_smooth1 = 1e0;% 1e-2 ~ 1e0
 dt_lpf_delta = 0.01;
 
-f_int_max = 15;
-tau_int_max = 2;
+f_int_max = 100;
+tau_int_max = 100;
 
-kinematic_error = 1.1; %TODO
 
 % Simulation Parmeters
 N_sim_tmp = 5000;
@@ -138,6 +127,7 @@ disturb_sim = zeros(N_sim, 6);
 % Modeling error
 mass_uncertainty = 1.00; 
 inertia_uncertainty = 1.00;
+kinematic_error = 1.1; %TODO
 
 % X, w_estimation error
 X_error = zeros(3, num_AMs);

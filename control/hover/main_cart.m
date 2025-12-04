@@ -23,7 +23,7 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 %% inertia
-num_AMs = 7;
+num_AMs = 5;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -33,10 +33,11 @@ I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
 shape_pitch = [30 10 20 -20 -10 0 10 10 20 30 -10 -20 -30 -20];
+shape_pitch =[0 0 0 0 0 0 0];
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 * pi); % from EE to i'th EE
 end
-l1 = 0.3; l2 = 0.3; % ca = 0.24
+l1 = 0.35; l2 = 0.35; % ca = 0.24
 
 M_o = 10; box_width = 1.0; box_height = 0.6;
 mu_st = 0.9;
@@ -62,11 +63,11 @@ end
 r_e = r_cj{1} + l1 * R_shape{1} * e_1; % position of EE w.r.t AM's com
 r_o = r_e +  [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
 %%
-wn = 1.5; damp = 1.1; % 0.5, 1.2
+wn = 2.0; damp = 1.1; % 0.5, 1.2
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
 
-wn = 1.5; damp = 1.1; % 1, 1.2
+wn = 2.0; damp = 1.1; % 1, 1.2
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
 
@@ -106,7 +107,7 @@ alpha = 10; % 4 or 10
 gamma = alpha * 1.0; % alpha * 1.0 
 
 % Simulation Parmeters
-N_sim_tmp = 20000;
+N_sim_tmp = 5000;
 show_video = true;
 save_video = true;
 video_speed = 1.0;
@@ -145,12 +146,6 @@ rng('shuffle')
 X_hover = [-0.5; 0; 0.0] * 1e0;
 rpy_hover = [0, 0, 0] / 180 * pi; velocity = [-0.1; 0; 0]; maximum_X = [1.0; 0; 1.0];
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, velocity, maximum_X, N_sim, dt_sim);
-% helix
-radius = 0.3;  v_z = 0.0;
-omega = 2 * pi * 0.01; 
-rpyd  = [0.00; 0.00; 0.0] * 2 * pi;
-X_hover = [0.0; 0; 0.0]; rpy_hover = [0, 0, 0] / 180 * pi; 
-%[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 %%
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
 w = [0; 0; 0]; wd = [0; 0; 0];
@@ -281,8 +276,8 @@ for i = 1:N_sim_tmp
         end
     end
 
-    for j = num_AMs:-1:1
-    %for j = 1:num_AMs
+    % for j = num_AMs:-1:1
+    for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};

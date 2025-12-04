@@ -2,7 +2,6 @@ addpath("../dynamics", "../functions", "../../params", "../../../casadi-3.6.7-wi
 clear; close all
 import casadi.*
 params = define_params_ver2();
-%mq = params{1}; Iq = params{2}; 
 mu = params{3}; r = params{4}; d = params{5};
 thrust_limit= params{6}; gravity = params{16};
 mb = params{17}; cb = params{18}; Ib = params{19};
@@ -23,7 +22,7 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 %% inertia
-num_AMs = 5;
+num_AMs = 3;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -32,15 +31,18 @@ r_cj = cell(num_AMs, 1); % com to j'th module
 I_cj = cell(num_AMs, 1); % inertia of j'th module w.r.t. com of shpe
 mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
-shape_pitch =[0 10 20 -20 -10 0 10];
+% shape_pitch =[0 10 20 -20 -10 0 10];
+% shape_pitch =[0 0 0 0 0 0 0];
+shape_pitch =[0 -10 -10 10 -10 -10 10];
+
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
 end
 l1 = 0.35; l2 = 0.3; % ca = 0.24
 
-M_o = 3; box_width = 1.0; box_height = 0.6;
-mu_st = 0.9;
-mu_dyna = 0.7;
+M_o = 10; box_width = 1.0; box_height = 0.6;
+mu_st = 0.6;
+mu_dyna = 0.4; 
 
 AM_mass = sum(mass_ams);
 for j = 1:num_AMs
@@ -59,21 +61,33 @@ for j = 1:num_AMs
     AM_inertia = AM_inertia + I_cj{j};
 end
 
-r_e = r_cj{1} + l1 * R_shape{1} * e_1; % position of EE w.r.t AM's com
-r_o = r_e +  [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
+M = zeros(num_AMs * 6, num_AMs * 6);
+for j =1:num_AMs
+    M(3*j-2: 3*j, 3*j-2: 3*j) = mass_ams(j) * eye(3);
+    M(3*(j+num_AMs)-2: 3*(j+num_AMs), 3*(j+num_AMs)-2: 3*(j+num_AMs)) = It + Ib;
+end
+
+r_e_ = r_cj{1} + l1 * R_shape{1} * e_1; % position of EE w.r.t AM's com
+r_o = r_e_ +  [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
 %%
-wn = 2.0; damp = 1.0; % 0.5, 1.2
+wn = 2.0; damp = 1.1; % 0.5, 1.2
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
 
-wn = 2.0; damp = 1.0; % 1, 1.2
+wn = 2.0; damp = 1.1; % 1, 1.2
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
 
 kp_M = diag([kp_M, kp_M, kp_z]);
 kv_M = diag([kv_M, kv_M, kv_z]);
 
-kw_I = 20; % 10 or 20 or 100
+kw_I = 10; % 10 or 20 or 100
+
+% Backstepping gain
+epsilon = kv_M(1, 1) * 0.3; % kv_M(1, 1) * 0.7
+alpha = 4; % 4 or 10
+gamma = alpha * 1.0; % alpha * 1.0 
+beta = diag([1 1 1]) * m0 * norm(gravity) * 1.0; % 1 1 1 * m0 * norm(gravity) * 10
 
 % servo moter
 kp_servo = 0.01; % 0.1 / 0.01
@@ -85,37 +99,18 @@ damped = 0.0; % 0.3
 k_pitch = 0.5; % 1.0
 
 % MBO gain : 게인값을 높이고 필터링도 괜찮을듯 
-k_mbo = diag([1.0 1.0 1.0 1.0]) * 1e0; % 3e0
+k_mbo = diag([1.0 1.0 1.0 1.0]) * 3e0; % 3e0
 dt_lpf = 0.2;
-dt_lpf_jerk = 0.2;
-
-% Admittance control gain TODO
-do_adm = true;
-m_ad = AM_mass * 1.2;
-wn = 3; damp = 1.2;
-kp_ad = wn^2 * m_ad; 
-kv_ad = 2 * damp *sqrt(kp_ad * m_ad);
-
-m_w_ad = AM_inertia(2, 2) * 1.5;
-wn = 3; damp = 1.2;
-kp_w_ad = wn^2 * m_w_ad; 
-kv_w_ad = 2 * damp *sqrt(kp_w_ad * m_w_ad);
-
-% Backstepping gain
-epsilon = kv_M(1, 1) * 0.3; % kv_M(1, 1) * 0.7
-alpha = 4; % 4 or 10
-gamma = alpha * 1.0; % alpha * 1.0 
-beta = diag([1 1 1]) * m0 * norm(gravity) * 1.0; % 1 1 1 * m0 * norm(gravity) * 10
 
 % Simulation Parmeters
-N_sim_tmp = 5000;
+N_sim_tmp = 10000;
 show_video = true;
 save_video = true;
-video_speed = 4.0;
+video_speed = 2.0;
 
 % Thrust limit and w_des limit
 thrust_limit = thrust_limit * 1.0; % 1 ~ 3
-w_des_limit = 5.0; % 2 ~ 10
+w_des_limit = 3.0; % 2 ~ 10
 
 % disturbance
 % payload at EE
@@ -144,15 +139,9 @@ delay_mbo = 0.01 / dt_sim; % 0.01
 
 rng('shuffle')
 
-X_hover = [-0.5; 0; 0.2] * 1e0;
-rpy_hover = [0, 5, 0] / 180 * pi; velocity = [-0.1; 0; 0]; maximum_X = [1.0; 0; 1.0];
+X_hover = [-0.5; 0; 0.0] * 1e0;
+rpy_hover = [0, 0, 0] / 180 * pi; velocity = [-0.1; 0; 0]; maximum_X = [2.0; 0; 2.0];
 [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, velocity, maximum_X, N_sim, dt_sim);
-% helix
-radius = 0.3;  v_z = 0.1;
-omega = 2 * pi * 0.2; 
-rpyd  = [0.00; -0.02; 0.0] * 2 * pi;
-X_hover = [0.1; 0; 0.3]; rpy_hover = [0, 0, 0] / 180 * pi; 
-%[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 %%
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
 w = [0; 0; 0]; wd = [0; 0; 0];
@@ -172,7 +161,7 @@ end
 lambda_prev = mass_ams * norm(gravity) * 1.0;
 delta_hat = zeros(4, num_AMs);
 delta_hatd = zeros(4, num_AMs);
-delta_hat_tot = zeros(4, 1);
+f_ext_hat = zeros(4, 1);
 h_0 = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)]; % linear moment
 int_mbo = zeros(4, 1);
 force_tot_mbo = AM_mass * norm(gravity) * e_3;
@@ -180,9 +169,6 @@ tau_tot_mbo = zeros(3, 1);
 lambda_mbo = lambda_prev;
 phi_prev = phi; phid_prev = phid;
 Delta_p_opt = zeros(3, num_AMs); Delta_w_opt = zeros(1, num_AMs);
-
-X_ad = X_des(:, 1); Xd_ad = Xd_des(:, 1);
-w_ad = [0; 0; 0]; wd_ad = [0; 0; 0]; phi_ad = atan2(R_e_des{1}(1,3), R_e_des{1}(1,1));
 
 w_quad_des_prev = zeros(3, num_AMs);
 
@@ -194,9 +180,11 @@ force_per_M_hist = []; delta_hat_x_per_M_hist = [];
 e_theta_hist = []; e_thetad_hist = [];
 e_pitch_hist = []; e_R_hist = [];
 pitch_hist = []; pitch_des_hist = []; phi_hist = [];
-disturb_hist = []; delta_hat_tot_hist = [];
-X_ad_hist = []; Xd_ad_hist = []; Xdd_ad_hist = []; Xddd_ad_hist = [];
-w_ad_hist = []; wd_ad_hist = []; phi_ad_hist = [];
+disturb_hist = []; f_ext_hat_hist = [];
+internal_f_opt_hist = []; internal_tau_opt_hist = [];
+internal_f_real_hist = []; internal_tau_real_hist = []; 
+internal_f_real_tq_hist = []; internal_tau_real_tq_hist = []; 
+internal_f_real_qd_hist = []; internal_tau_real_qd_hist = []; 
 times = [];
 
 
@@ -214,6 +202,8 @@ for i = 1:N_sim_tmp
     thrusts = [];
     force_per_M = [];
     delta_hat_x_per_M = [];
+
+    input_real = zeros(num_AMs*6, 1);
     
     % estimation error
     X_error_dot = randn(3, num_AMs) * sigma_X;
@@ -226,45 +216,30 @@ for i = 1:N_sim_tmp
     % MBO and Admittance control
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
         h = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)];
-        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + delta_hat_tot) * dt_sim * delay_mbo; 
+        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + f_ext_hat) * dt_sim * delay_mbo; 
         % 1-order LPF
-        delta_hat_tot_sensored = k_mbo * (h - int_mbo - h_0);
-        delta_hat_tot = (dt_lpf * delta_hat_tot + dt_sim * delay_mbo * delta_hat_tot_sensored) / (dt_lpf + dt_sim * delay_mbo);
+        f_ext_hat_sensored = k_mbo * (h - int_mbo - h_0);
+        f_ext_hat = (dt_lpf * f_ext_hat + dt_sim * delay_mbo * f_ext_hat_sensored) / (dt_lpf + dt_sim * delay_mbo);
         
         tau_tot_mbo = zeros(3, 1);
 
-        % Admittance control
-        ep_ad = X_ad - X_des(:, i);
-        ev_ad = Xd_ad - Xd_des(:, i);
-    
-        Xdd_ad = Xdd_des(:, i)  + (delta_hat_tot(1:3) - kv_ad * ev_ad  - kp_ad * ep_ad)/ m_ad;
-        Xd_ad= Xd_ad + Xdd_ad * dt_sim * delay_mbo;
-        X_ad = X_ad + Xd_ad * dt_sim * delay_mbo + 0.5 * Xdd_ad * (dt_sim * delay_mbo)^2;
-
-        if i == 1
-            Xddd_ad = Xddd_des(:, i);
-            Xdd_ad_prev = Xdd_ad;
-        else
-            Xddd_ad = (Xdd_ad - Xdd_ad_prev) / (dt_sim * delay_mbo);
-            Xdd_ad_prev = Xdd_ad;
+        % Internal forces : expensive
+        A = zeros((num_AMs-1)*6,num_AMs*6);          
+        Ad = zeros((num_AMs-1)*6,num_AMs*6);          
+        % l1_hat = l1 * kinematic_error;
+        % l2_hat = l2 * kinematic_error;
+        
+        for j = 1:num_AMs - 1
+            A(3*j-2: 3*j, 3*j-2: 3*j+3) = [eye(3), -eye(3)];
+            A(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j} * S(e_1), l1 * R * R_shape{j+1} * S(e_1)];
+            A(3*(j+num_AMs-1)-2: 3*(j+num_AMs-1), 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [eye(3), -eye(3)];
+            Ad(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j}  * S(w) * S(e_1), l1 * R * R_shape{j+1}  * S(w) * S(e_1)];
         end
-        
-        phi_des = atan2(R_e_des{i}(1,3), R_e_des{i}(1,1));
-        ep_w_ad = wrapToPi(phi_ad - phi_des);
-        ev_w_ad = w_ad(2) - w_e_des(2, i);
+        A_dagger = ((A* (M\ A')) \ A) * inv(M);
 
-        wd_ad = wd_e_des(:, i) + (delta_hat_tot(4) - kv_w_ad * ev_w_ad - kp_w_ad * ep_w_ad)/ m_w_ad * e_2;
-        w_ad= w_ad + wd_ad * dt_sim * delay_mbo;
-        phi_ad = phi_ad + w_ad(2) * dt_sim * delay_mbo + 0.5 * wd_ad(2) * (dt_sim * delay_mbo)^2;
-        
-        R_ad = Ry(phi_ad);
     end    
 
-    % % Xd_ad= Xd_ad + Xdd_ad * dt_sim;
-    % % X_ad = X_ad + Xd_ad * dt_sim + 0.5 * Xdd_ad * (dt_sim)^2;
-
-    for j = num_AMs:-1:1
-    %for j = 1:num_AMs
+    for j = 1:num_AMs
         % position control - backstepping
         mj = mass_ams(j);
         rj = r_cj{j};
@@ -275,28 +250,14 @@ for i = 1:N_sim_tmp
         w_quad_j = (1 - w_error(:, j)).*[0; phid(j); 0];
         
         X_quad = X + R * rj; 
-        X_des_quad = X_ad + R_ad * rj;
+        X_des_quad = X_des(:, i) + R_e_des{i} * rj;
         Xd_quad = Xd + Rd * rj; 
-        Xd_des_quad = Xd_ad + R_ad * S(w_ad) * rj;
-        Xdd_des_quad = Xdd_ad + R_ad * S2(w_ad) * rj + R_ad* S(wd_ad) * rj;
-        
-        if ~do_adm
-            X_des_quad = X_des(:, i) + R_e_des{i} * rj;
-            Xd_des_quad = Xd_des(:, i) + R_e_des{i} * S(w_e_des(:, i)) * rj;
-            Xdd_des_quad = Xdd_des(:, i) + R_e_des{i}* S2(w_e_des(:, i)) * rj + R_e_des{i}* S(wd_e_des(:,i)) * rj;
-        end
+        Xd_des_quad = Xd_des(:, i) + R_e_des{i} * S(w_e_des(:, i)) * rj;
+        Xdd_des_quad = Xdd_des(:, i) + R_e_des{i}* S2(w_e_des(:, i)) * rj + R_e_des{i}* S(wd_e_des(:,i)) * rj;
 
-        % if i < N_sim % TODO
-        %     Xddd_des_quad(:, j) = (Xdd_des(:, i+1) + R_e_des{i+1}* S2(w_e_des(:,i)) * rj + R_e_des{i+1}* S(wd_e_des(:,i)) * rj...
-        %                            - Xdd_des_quad) / dt_sim;
-        % end
-
-        if i > 1
-            Xddd_des_sensored = (Xdd_des_quad - Xdd_des_quad_prev(:, j)) / dt_sim / delay_bs;
-            Xddd_des_quad(:, j) = (dt_lpf_jerk * Xddd_des_quad(:, j) + dt_sim * Xddd_des_sensored) / (dt_lpf_jerk + dt_sim);
-            Xdd_des_quad_prev(:, j) = Xdd_des_quad;
-        else
-            Xddd_des_quad(:, j) = [0; 0; 0];
+        if i < N_sim 
+            Xddd_des_quad(:, j) = (Xdd_des(:, i+1) + R_e_des{i+1}* S2(w_e_des(:,i)) * rj + R_e_des{i+1}* S(wd_e_des(:,i)) * rj...
+                                   - Xdd_des_quad) / dt_sim;
         end
         
         if mod(i, delay_bs) == 1 || delay_bs == 1
@@ -334,13 +295,8 @@ for i = 1:N_sim_tmp
             R_e_j = R * R_shape{j};
             w_e_j = R_shape{j}' * w;
     
-            R_e_des_j = R_ad * R_shape{j};
-            w_e_des_j = R_shape{j}' * w_ad;
-            
-            if ~do_adm
-                R_e_des_j = R_e_des{i} * R_shape{j};
-                w_e_des_j = R_shape{j}' * w_e_des(:, i);
-            end
+            R_e_des_j = R_e_des{i} * R_shape{j};
+            w_e_des_j = R_shape{j}' * w_e_des(:, i);
             
             % End effector control
             R_e_des_j_ = R_e_des{i} * R_shape{j};
@@ -397,7 +353,9 @@ for i = 1:N_sim_tmp
         thetad_prev = thetad(j);
         thetad(j) = wrapToPi(w_e_j(2) - phid(j));
         thetadd(j) = (thetad(j) - thetad_prev) / dt_sim;
-
+        
+        input_real(3*j -2:3*j) = R_quad * [0; 0; lambda_j] + mass_ams(j) * gravity;
+        input_real(3*(j+num_AMs) -2:3*(j+num_AMs)) = (tau_j - tau_theta(j)) * e_2;
         thrusts = [thrusts; thrust_j];
         force_per_M = [force_per_M; lambda_j / mj];
         delta_hat_x_per_M = [delta_hat_x_per_M; delta_hat(3, j) / mj];
@@ -415,7 +373,6 @@ for i = 1:N_sim_tmp
     %force_tot : sigma lambdai *Ri *e3
     Xdd = (M_o + AM_mass * mass_uncertainty)\(force_tot - (M_o + AM_mass * mass_uncertainty) * 9.81 * e_3 + disturb(1:3));
     Xdd(2) = 0; Xdd(3) = 0;
-    %disp(Xdd')
     if abs(Xd(1)) < 1e-3
         if abs(Xdd(1)) < mu_st * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty)
             Xdd(1) = 0;
@@ -426,8 +383,6 @@ for i = 1:N_sim_tmp
     else
          Xdd(1) = Xdd(1) - sign(Xd(1)) * mu_dyna * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty);
     end
-    %disp(Xdd')
-    % tau_tot : sigma tau_i + tau_theta(1) + r x lambda
     wd = 0;
     
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
@@ -448,10 +403,6 @@ for i = 1:N_sim_tmp
     % Log
     X_hist  = [X_hist, X];
     Xd_hist = [Xd_hist, Xd];
-    X_ad_hist  = [X_ad_hist, X_ad];
-    Xd_ad_hist = [Xd_ad_hist, Xd_ad];
-    Xdd_ad_hist = [Xdd_ad_hist, Xdd_ad];
-    Xddd_ad_hist = [Xddd_ad_hist, Xddd_des_quad(:, j)];
     w_hist  = [w_hist, w_quad_j];
     w_des_hist = [w_des_hist, w_quad_des];
     wd_hist = [wd_hist, wd];
@@ -462,8 +413,8 @@ for i = 1:N_sim_tmp
     delta_hat_x_per_M_hist = [delta_hat_x_per_M_hist, delta_hat_x_per_M];
     
     % totoal
-    e_p = X - X_ad; 
-    e_pd = Xd - Xd_ad;
+    e_p = X - X_des(:, i); 
+    e_pd = Xd - Xd_des(:, i);
     
     % quad
     e_w_quad = [0; phid(j); 0] - w_quad_des;
@@ -474,20 +425,38 @@ for i = 1:N_sim_tmp
     nu_e_hist = [nu_e_hist, nu_ej];
     delta_hat_hist = [delta_hat_hist, delta_hat(:, j)];
     delta_tilde_hist = [delta_tilde_hist, mj / AM_mass * disturb(1:3) - delta_hat(1:3, j)];
-    delta_hat_tot_hist = [delta_hat_tot_hist, delta_hat_tot];
-    %disp(Xdd');
+    f_ext_hat_hist = [f_ext_hat_hist, f_ext_hat];
+   
     disturb_cart = [- force_tot + AM_mass * 9.81 * e_3 + AM_mass * Xdd; -tau_tot];
     disturb_hist = [disturb_hist, disturb_cart];
 
     pitch_hist = [pitch_hist, wrapToPi(pitch)];
     pitch_des_hist = [pitch_des_hist, wrapToPi(pitch_des)];
-    phi_ad_hist = [phi_ad_hist, phi_ad];
     phi_hist = [phi_hist, phi];
    
     e_pitch_hist = [e_pitch_hist, e_pitch];
     e_theta_hist = [e_theta_hist, e_theta];
     e_thetad_hist = [e_thetad_hist, e_thetad]; 
     times = [times; i * dt_sim];
+
+
+    r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
+    F_ext = [f_ext_hat(1:3); zeros(3*num_AMs -3, 1);
+    e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
+    qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
+    Cqd = zeros(6*num_AMs) * qd;
+
+    internal_qd = - ((A* (M\ A')) \ Ad) * qd;
+    internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd(1:3*(num_AMs-1))]; 
+    internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd(3*(num_AMs-1)+1:end)];
+    
+    internal_tq = A_dagger * [zeros(3*num_AMs, 1); input_real(3*num_AMs+1:end)];
+    internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_tq(1:3*(num_AMs-1))]; 
+    internal_tau_real_tq_hist = [internal_tau_real_tq_hist,  internal_tq(3*(num_AMs-1)+1:end)];
+
+    internal_real = A_dagger * (-input_real - F_ext - Cqd) + internal_qd;
+    internal_f_real_hist = [internal_f_real_hist, internal_real(1:3*(num_AMs-1))]; 
+    internal_tau_real_hist = [internal_tau_real_hist, internal_real(3*(num_AMs-1) + 1:end)];
 end
 toc
 %% State plot
@@ -499,10 +468,9 @@ hold on
 for j = [1, 3]
     plot(times, X_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     plot(times, X_des(j, 1:i), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
-    plot(times, X_ad_hist(j, :), ':', 'Color', colors(j,:), 'LineWidth', 2.5);
 end
-legend({'$X_x$', '$X_x^{\mathrm{des}}$', '$X_x^{\mathrm{ad}}$', ...
-        '$X_z$', '$X_z^{\mathrm{des}}$', '$X_z^{\mathrm{ad}}$'}, ...
+legend({'$X_x$', '$X_x^{\mathrm{des}}$', ...
+        '$X_z$', '$X_z^{\mathrm{des}}$'}, ...
         'Interpreter','latex','FontSize', 10);
 title('$\mathbf{X}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
@@ -512,10 +480,9 @@ hold on
 for j = [1, 3]
     plot(times, Xd_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     plot(times, Xd_des(j, 1:i), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
-    plot(times, Xd_ad_hist(j, :), ':', 'Color', colors(j,:), 'LineWidth', 2.5);
 end
-legend({'$\dot{X}_x$', '$\dot{X}_x^{\mathrm{des}}$', '$\dot{X}_x^{\mathrm{ad}}$', ...
-        '$\dot{X}_z$', '$\dot{X}_z^{\mathrm{des}}$', '$\dot{X}_z^{\mathrm{ad}}$'}, ...
+legend({'$\dot{X}_x$', '$\dot{X}_x^{\mathrm{des}}$', ...
+        '$\dot{X}_z$', '$\dot{X}_z^{\mathrm{des}}$'}, ...
         'Interpreter','latex','FontSize', 10);
 title('$\dot{\mathbf{X}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
@@ -537,9 +504,8 @@ subplot(2,2,4)
 hold on
 plot(times, pitch_hist / pi * 180, 'Color', colors(2,:), 'LineWidth', 1.0);
 plot(times, pitch_des_hist / pi * 180, '--', 'Color', colors(2,:), 'LineWidth', 2.5);
-plot(times, phi_ad_hist / pi * 180, ':', 'Color', colors(2,:), 'LineWidth', 2.5);
 ylabel("degree")
-legend({'$\phi_{e,1}$', '$\phi_{e,1}^{\mathrm{des}}$', '$\phi_{e,1}^{\mathrm{adm}}$'}, ...
+legend({'$\phi_{e,1}$', '$\phi_{e,1}^{\mathrm{des}}$'}, ...
        'Interpreter', 'latex','FontSize', 12);
 title('${\phi_{e}}$ vs Desired', 'Interpreter', 'latex','FontSize', 14)
 grid on
@@ -592,7 +558,7 @@ grid on
 subplot(3,2,5)
 hold on
 for j = 1:4
-    plot(times, delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+    plot(times, f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     if j==4 
         plot(times, disturb_hist(5, :), 'Color', colors(j,:), 'LineWidth', 1.0, 'LineStyle','--');
     else
@@ -611,9 +577,9 @@ subplot(3,2,6)
 hold on
 for j = 1:4
     if j==4 
-        plot(times, disturb_hist(5, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(5, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     else
-        plot(times, disturb_hist(j, :) - delta_hat_tot_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+        plot(times, disturb_hist(j, :) - f_ext_hat_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
     end
 end
 legend({'$\tilde{\Delta}_x$',...
@@ -622,48 +588,26 @@ legend({'$\tilde{\Delta}_x$',...
         '$\tilde{\Delta}_y$'},'Interpreter','latex','FontSize', 12);
 title('$\tilde{\Delta}$', 'Interpreter', 'latex','FontSize', 14)
 grid on
-%% Xdd plot
-figure('Position',[800 100 500 400]);
-subplot(2,1,1)
-hold on
-for j = [1, 3]
-    plot(times(2500:end), Xdd_des(j, 2500:i), 'Color', colors(j,:), 'LineWidth', 1);
-    plot(times(2500:end), Xdd_ad_hist(j, 2500:end), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
-end
-legend({'$x^{\mathrm{des}}$', '$x^{\mathrm{ad}}$', ...
-        '$z^{\mathrm{des}}$', '$z^{\mathrm{ad}}$'}, ...
-        'Interpreter','latex','FontSize', 10);
-title('Acceleration', 'Interpreter', 'latex','FontSize', 14)
-grid on
 
-subplot(2,1,2)
-hold on
-for j = [1, 3]
-    plot(times(2500:end), Xddd_des(j, 2500:i), 'Color', colors(j,:), 'LineWidth', 1);
-    plot(times(2500:end), Xddd_ad_hist(j, 2500:end), '--', 'Color', colors(j,:), 'LineWidth', 2.5);
-end
-legend({'$x^{\mathrm{des}}$', '$x^{\mathrm{ad}}$', ...
-        '$z^{\mathrm{des}}$', '$z^{\mathrm{ad}}$'}, ...
-        'Interpreter','latex','FontSize', 10);
-title('Jerk', 'Interpreter', 'latex','FontSize', 14)
-grid on
-
-%% force/disturbance balance
-figure('Position',[1350 550 500 400]);
+%% force/disturbance
+figure('Position',[1350 550 400 400]);
 
 % 7. thrusts
 subplot(3,1,1)
 hold on
 plot(times, thrusts_hist, 'LineWidth', 1.0);
-%ylim([ -thrust_limit, thrust_limit] )
+ylabel("[N]")
+ylim([ 0, thrust_limit/2] )
 title('Thrusts', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
 
 legend_entries = arrayfun(@(x) sprintf('%d', x), 1:num_AMs, 'UniformOutput', false);
 subplot(3,1,2)
-plot(times, force_per_M_hist)
-title('$\frac{\lambda_{p,i}}{M_i}$', 'Interpreter', 'latex','FontSize', 14)
+plot(times, force_per_M_hist * mass_ams(1))
+title('$\lambda_{i}$', 'Interpreter', 'latex','FontSize', 14)
+ylabel("[N]")
+ylim([ 0, thrust_limit*2] )
 legend(legend_entries)
 grid on
 
@@ -703,6 +647,87 @@ for j = 1:1
 end
 legend({'$pitch$'},'Interpreter','latex','FontSize', 12);
 title('$e_{\dot\theta}$', 'Interpreter', 'latex','FontSize', 14)
+grid on
+%% Internal forces
+figure('Position',[1000 50 600 700]);
+colors = lines(6);
+
+% subplot(4,2,1)
+% hold on
+% for j = 1:num_AMs-1
+%     % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_opt_hist(3*j-2, :), 'LineWidth', 1.0);
+%     plot(times, internal_f_opt_hist(3*j, :), 'LineWidth', 1.0);
+% end
+% % legend({'$2,x$','$2,z$','$3,x$','$2,z$' },'Interpreter','latex','FontSize', 8);
+% ylabel("[N]")
+% title('Internal forces(Optimized)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+% 
+% 
+% subplot(4,2,2)
+% hold on
+% for j = 1:num_AMs-1
+%     plot(times, internal_tau_opt_hist(3*j-1, :), 'LineWidth', 1.0);
+% end
+% ylabel("[Nm]")
+% title('Internal torques(Optimized)', 'Interpreter', 'latex','FontSize', 14)
+% grid on
+
+subplot(4,2,3)
+hold on
+for j = 1:num_AMs-1
+    % plot(times, internal_f_opt_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+    plot(times, internal_f_real_hist(3*j-2, :), 'LineWidth', 1.0);
+    plot(times, internal_f_real_hist(3*j, :), 'LineWidth', 1.0);
+end
+ylabel("[N]")
+title('Internal forces(Real)', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+subplot(4,2,4)
+hold on
+for j = 1:num_AMs-1
+    plot(times, internal_tau_real_hist(3*j-1, :), 'LineWidth', 1.0);
+end
+ylabel("[Nm]")
+title('Internal torques(Real)', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+subplot(4,2,5)
+hold on
+for j = 1:num_AMs-1
+    plot(times, internal_f_real_tq_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+end
+ylabel("[N]")
+title('Internal forces(by torque)', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+subplot(4,2,6)
+hold on
+for j = 1:num_AMs-1
+    plot(times, internal_tau_real_tq_hist(3*j-1, :), 'LineWidth', 1.0);
+end
+ylabel("[Nm]")
+title('Internal torques(by torque)', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+subplot(4,2,7)
+hold on
+for j = 1:num_AMs-1
+    plot(times, internal_f_real_qd_hist(3*j-2:3*j, :), 'LineWidth', 1.0);
+end
+ylabel("[N]")
+title('Internal forces(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+subplot(4,2,8)
+hold on
+for j = 1:num_AMs-1
+    plot(times, internal_tau_real_qd_hist(3*j-1, :), 'LineWidth', 1.0);
+end
+ylabel("[Nm]")
+title('Internal torques(by Ad qd)', 'Interpreter', 'latex','FontSize', 14)
 grid on
 %% Video
 if show_video
