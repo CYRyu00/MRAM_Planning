@@ -446,7 +446,7 @@ for i = 1:N_sim_tmp
     qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
     Cqd = zeros(6*num_AMs) * qd;
 
-    internal_qd = - ((A* (M\ A')) \ Ad) * qd;
+    internal_qd = ((A* (M\ A')) \ Ad) * qd;
     internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd(1:3*(num_AMs-1))]; 
     internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd(3*(num_AMs-1)+1:end)];
     
@@ -454,7 +454,7 @@ for i = 1:N_sim_tmp
     internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_tq(1:3*(num_AMs-1))]; 
     internal_tau_real_tq_hist = [internal_tau_real_tq_hist,  internal_tq(3*(num_AMs-1)+1:end)];
 
-    internal_real = A_dagger * (-input_real - F_ext - Cqd) + internal_qd;
+    internal_real = A_dagger * (input_real + F_ext - Cqd) + internal_qd;
     internal_f_real_hist = [internal_f_real_hist, internal_real(1:3*(num_AMs-1))]; 
     internal_tau_real_hist = [internal_tau_real_hist, internal_real(3*(num_AMs-1) + 1:end)];
 end

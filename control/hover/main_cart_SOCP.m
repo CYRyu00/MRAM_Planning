@@ -114,8 +114,8 @@ tau_int_max = 3;
 
 % Simulation Parmeters
 N_sim_tmp = 10000;
-show_video = true;
-save_video = true;
+show_video = false;
+save_video = false;
 video_speed = 2.0;
 
 % Thrust limit and w_des limit
@@ -312,8 +312,8 @@ for i = 1:N_sim_tmp
                  e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
         qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
         Cqd = zeros(6*num_AMs) * qd;
-        F_int0 = A_dagger *([v; zeros(3*num_AMs, 1)] - F_ext + Cqd) - ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
-        A_delta = A_dagger(:, 1:3*num_AMs);
+        F_int0 = A_dagger *([v; zeros(3*num_AMs, 1)] + F_ext - Cqd) + ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
+        A_delta = -A_dagger(:, 1:3*num_AMs);
         F_int_max = [f_int_max * ones(3*(num_AMs-1),1); tau_int_max * ones(3*(num_AMs-1),1)];
 
         A_ineq = [A_ineq; A_delta, zeros(6*(num_AMs-1), 2);...
@@ -559,7 +559,7 @@ for i = 1:N_sim_tmp
     qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
     Cqd = zeros(6*num_AMs) * qd;
 
-    internal_qd = - ((A* (M\ A')) \ Ad) * qd;
+    internal_qd = ((A* (M\ A')) \ Ad) * qd;
     internal_f_real_qd_hist = [internal_f_real_qd_hist, internal_qd(1:3*(num_AMs-1))]; 
     internal_tau_real_qd_hist = [internal_tau_real_qd_hist, internal_qd(3*(num_AMs-1)+1:end)];
     
@@ -567,7 +567,7 @@ for i = 1:N_sim_tmp
     internal_f_real_tq_hist = [internal_f_real_tq_hist, internal_tq(1:3*(num_AMs-1))]; 
     internal_tau_real_tq_hist = [internal_tau_real_tq_hist,  internal_tq(3*(num_AMs-1)+1:end)];
 
-    internal_real = A_dagger * (-input_real - F_ext - Cqd) + internal_qd;
+    internal_real = A_dagger * (input_real + F_ext - Cqd) + internal_qd;
     internal_f_real_hist = [internal_f_real_hist, internal_real(1:3*(num_AMs-1))]; 
     internal_tau_real_hist = [internal_tau_real_hist, internal_real(3*(num_AMs-1) + 1:end)];
 end
