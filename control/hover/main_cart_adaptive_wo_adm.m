@@ -232,7 +232,7 @@ for i = 1:N_sim_tmp
         for j = 1:num_AMs - 1
             A(3*j-2: 3*j, 3*j-2: 3*j+3) = [eye(3), -eye(3)];
             A(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j} * S(e_1), l1 * R * R_shape{j+1} * S(e_1)];
-            A(3*(j+num_AMs-1)-2: 3*(j+num_AMs-1), 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [eye(3), -eye(3)];
+            A(3*(j+num_AMs-1)-2: 3*(j+num_AMs-1), 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [R_shape{j+1}' * R_shape{j}, -eye(3)];
             Ad(3*j-2: 3*j, 3*(j+num_AMs)-2: 3*(j+num_AMs)+3) = [l2 * R * R_shape{j}  * S(w) * S(e_1), l1 * R * R_shape{j+1}  * S(w) * S(e_1)];
         end
         A_dagger = ((A* (M\ A')) \ A) * inv(M);
