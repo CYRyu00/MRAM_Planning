@@ -1,4 +1,4 @@
-function [qdd, f_in, tau_in] = FD_cart_ver2(p_1, phi_1, pd_1, w_1, shape_pitch, r_g, U, M, k_obj, b_obj, l1, l2, n_o, n_am)
+function [qdd, f_int, tau_int] = FD_cart_ver2(p_1, phi_1, pd_1, w_1, shape_pitch, r_g, U, M, k_obj, b_obj, l1, l2, n_o, n_am)
     e_1 = [1; 0; 0]; %e_2 = [0; 1; 0]; e_3 = [0; 0; 1];
     % kinematics
     qd = zeros(n_o + n_am*6, 1);
@@ -42,7 +42,7 @@ function [qdd, f_in, tau_in] = FD_cart_ver2(p_1, phi_1, pd_1, w_1, shape_pitch, 
     
     A_o = [0 1 0; 0 0 1];
     A_o_am = [eye(3), -eye(3), zeros(3, (n_am-1)*3), l1 * R1 * S(e_1), zeros(3, (n_am-1)*3) ; ...
-             zeros(3, (n_am + 1)*3), eye(3), zeros(3, (n_am-1)*3)];
+             zeros(3, (n_am + 1)*3), -eye(3), zeros(3, (n_am-1)*3)];
     A = [A_o, zeros(2, n_am * 6); A_o_am; zeros((n_am-1)*6, n_o), A_am];
     
     Ad_o = [0 0 0; 0 0 0];
@@ -50,32 +50,18 @@ function [qdd, f_in, tau_in] = FD_cart_ver2(p_1, phi_1, pd_1, w_1, shape_pitch, 
              zeros(3, (2*n_am + 1)*3)];
     Ad = [Ad_o, zeros(2, n_am * 6); Ad_o_am; zeros((n_am-1)*6, n_o), Ad_am];
     
-    A_dagger = A' * inv((A* (M\ A')));
+    A_dagger = ((A* (M\ A')) \ A) * inv(M);
     
-    A_f_t = zeros(n_am * 3, n_am * 3);
-    A_f_r = zeros(n_am * 3, n_am * 3);
-    A_tau_r = zeros(n_am * 3, n_am * 3);
-    for j = 1 : n_am % f2, f3, f4 ...
-        Rj = Ry(phi(j));
-        if j == n_am
-            A_f_t(3*j-2:3*j, 3*j-2:3*j) = eye(3);
-            A_f_r(3*j-2:3*j, 3*j-2:3*j) = l1*S(Rj*e_1);
-            A_tau_r(3*j-2:3*j, 3*j-2:3*j) = eye(3);
-        else
-            A_f_t(3*j-2:3*j, 3*j-2:3*j+3) = [eye(3), -eye(3)];
-            A_f_r(3*j-2:3*j, 3*j-2:3*j+3) = [l1*S(Rj*e_1), -l2*S(Rj*e_1)];
-            A_tau_r(3*j-2:3*j, 3*j-2:3*j+3) = [eye(3), -eye(3)];
-        end
-    end
+    Cqd = zeros(6 * n_am + n_o) * qd;
 
     % Object input
     U_obj = - k_obj * p_o - b_obj * qd(1:3);
    
-    A_T_lambda = A_dagger * (Ad * qd + A * (M \ [U_obj; U]));
-    f_in = - A_f_t \ A_T_lambda(n_o + 1 : n_o + n_am*3);
-    tau_in = A_tau_r \ ( - A_T_lambda(n_o + n_am*3+1 : end) - A_f_r * f_in);
+    F_int = A_dagger * ([U_obj; U] - Cqd) + ((A* (M\ A'))\ Ad) * qd;
+    f_int = [F_int(3:5); F_int(9: n_am*3 +5) ]; % f 1 ~ n
+    tau_int = [F_int(6:8); F_int(n_am*3 +6:end) ]; % tau 1 ~ n
 
-    qdd = M\ ([U_obj ; U] - A_T_lambda);
+    qdd = M\ ([U_obj ; U] -  A'* F_int);
 end
 
 function out = Ry(q)

@@ -19,9 +19,75 @@ e_1 = [1; 0; 0];
 e_2 = [0; 1; 0];
 e_3 = [0; 0; 1];
 
-load("../../planning_KDD/data/test.mat")
+load("../../planning_KDD/data/10sec_2m.mat")
+
+dt_sim = 0.002;
+N_sim = N_opt * dt_opt/dt_sim;
+
+T_opt = N_opt * dt_opt;
+t_opt = linspace(0, T_opt, N_opt+1);
+t_new = linspace(0, T_opt, N_sim+1);
+
+x_n_interp = zeros(size(x_n_opt, 1), length(t_new));
+delta_n_interp = zeros(size(delta_n_opt, 1), length(t_new(1:end-1)));
+f_ext_interp = zeros(3, length(t_new(1:end-1)));
+tau_ext_interp = zeros(3, length(t_new(1:end-1)));
+
+for i = 1:size(x_n_opt, 1)
+    x_n_interp(i, :) = interp1(t_opt', x_n_opt(i, :), t_new', 'cubic')'; % pchip, linear, spline,cubic
+end
+for i = 1:size(delta_n_opt, 1)
+     delta_n_interp(i, :) = interp1(t_opt(1:end-1)', delta_n_opt(i, :), t_new(1:end-1)', 'spline')';
+end
+for i =1:3
+    f_ext_interp(i, :) = interp1(t_opt(1:end-1)', f_int_opt(i, :), t_new(1:end-1)', 'spline')';
+    tau_ext_interp(i, :) = interp1(t_opt(1:end-1)', tau_int_opt(i, :), t_new(1:end-1)', 'spline')';
+end
+   
+figure
+plot(t_opt, x_n_opt)
+hold on
+plot(t_new, x_n_interp, '--') 
+legend('Original State 1', 'Original State 2', 'Interp State 1', 'Interp State 2')
+title('Optimal Trajectory Interpolation')
+xlabel('Time')
+ylabel('State Value')
+
+% figure
+% plot(t_opt(1:end-1), delta_n_opt)
+% hold on
+% plot(t_new(1:end-1), delta_n_interp, '--') 
+% xlabel('Time')
+% ylabel('delta')
+% 
+% figure
+% plot(t_opt(1:end-1), f_int_opt(1:3,:))
+% hold on
+% plot(t_new(1:end-1), f_ext_interp, '--') 
+% xlabel('Time')
+% ylabel('f_1')
+
+X_des = zeros(3, N_sim);
+Xd_des = zeros(3, N_sim);
+Xdd_des = zeros(3, N_sim);
+Xddd_des = zeros(3, N_sim);
+R_e_des = cell(1, N_sim);
+w_e_des = zeros(3, N_sim);
+wd_e_des = zeros(3, N_sim);
+
+for i = 1:N_sim
+    X_des(:, i) = [x_n_interp(1, i); 0; 0];
+    Xd_des(:, i) = [x_n_interp(2, i); 0; 0];
+    Xdd_des(:, i) = [x_n_interp(2, i+1) - x_n_interp(2, i); 0; 0]/dt_sim;
+    if i < N_sim %TODO jerk
+        Xddd_des(:, i) = [x_n_interp(2, i+2) - 2*x_n_interp(2, i+1) + x_n_interp(2, i); 0; 0]/dt_sim^2;
+    else
+        Xddd_des(:, i) = Xddd_des(:, i-1);
+    end
+    R_e_des{i} = eye(3,3);
+end
 %% inertia
-num_AMs = 3;
+num_AMs = n_am_opt;
 AM_mass = 0; % mass of shape
 AM_inertia = zeros(3, 3); % inertia w.r.t. its com
 AM_com = [0; 0; 0];% 0 to com
@@ -32,17 +98,18 @@ mass_ams = m0 * ones(num_AMs, 1);
 R_shape = cell(1, num_AMs);
 % shape_pitch =[0 -10 -20 -10 0 0 10];
 % shape_pitch =[0 0 0 0 0 0 0];
-shape_pitch = [0 -10 -10 10 -10 -10 10];
-
+shape_pitch = shape_pitch_opt; % rad
 
 for j = 1:length(shape_pitch)
     R_shape{j} = Ry(shape_pitch(j) / 180 *pi);
 end
 l1 = 0.35; l2 = 0.30; % ca = 0.24
 
-M_o = 20; box_width = 1.0; box_height = 0.6;
-mu_st = 0.2;
-mu_dyna = 0.15; 
+box_width = 1.0; box_height = 0.6;
+M_o = mass_obj * 1.5; 
+mu_st = mu_s * 1.0;
+mu_dyna = mu_d * 1.0; 
+v_s = 0.001;
 
 AM_mass = sum(mass_ams);
 for j = 1:num_AMs
@@ -68,13 +135,13 @@ for j =1:num_AMs
 end
 
 r_e_ = r_cj{1} + l1 * R_shape{1} * e_1; % position of EE w.r.t AM's com
-r_o = r_e_ +  [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
+r_o = r_e_ + [box_width/2; 0; - box_height/2]; % position of Object's com w.r.t AM's com
 %%
-wn = 2.0; damp = 1.1; % 2, 1.1
+wn = 1.0; damp = 1.1; % 2, 1.1
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
 
-wn = 2.0; damp = 1.1; % 2, 1.1
+wn = 1.0; damp = 1.1; % 2, 1.1
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
 
@@ -106,15 +173,16 @@ tan_max = tan(60 / 180 * pi);
 k_smooth1 = 1e0;% 1e-2 ~ 1e0
 dt_lpf_delta = 0.01;
 
-f_int_max = 1000;
-tau_int_max = 1000;
+f_int_max = 40;
+tau_int_max = 3;
+delta_n_interp = delta_n_interp *1;
+f_ext_interp = f_ext_interp *1;
+tau_ext_interp = tau_ext_interp *1;
 
 % Simulation Parmeters
-dt_sim = 0.002;
-N_sim = 500;
 show_video = true;
-save_video = false;
-video_speed = 0.1;
+save_video = true;
+video_speed = 1.0;
 
 % Thrust limit and w_des limit
 thrust_limit = thrust_limit * 1.0; % 1 ~ 3
@@ -147,9 +215,9 @@ delay_mbo = 0.01 / dt_sim; % 0.01
 
 rng('shuffle')
 
-X_hover = [-0.0; 0; 0.0] * 1e0;
-rpy_hover = [0, 0, 0] / 180 * pi; velocity = [-0.2; 0; 0]; maximum_X = [1.7; 0; 1.7];
-[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, velocity, maximum_X, N_sim, dt_sim);
+% X_hover = [-0.0; 0; 0.0] * 1e0;
+% rpy_hover = [0, 0, 0] / 180 * pi; velocity = [-0.1; 0; 0]; maximum_X = [1.5; 0; 1.5];
+% [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_hover_manip(X_hover, rpy_hover, velocity, maximum_X, N_sim, dt_sim);
 
 %%
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
@@ -224,8 +292,10 @@ for i = 1:N_sim
     
     % MBO
     if mod(i, delay_mbo) == 1 || delay_mbo == 1
+        r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
         h = [AM_mass * Xd; e_2' * (AM_inertia - It * num_AMs) * w + It(2,2) * sum(phid)];
-        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3); tau_tot_mbo(2)] + f_ext_hat) * dt_sim * delay_mbo; 
+        int_mbo = int_mbo + ([(force_tot_mbo - AM_mass * norm(gravity) * e_3) + f_ext_interp(:, i); ...
+                  tau_tot_mbo(2)+ e_2' * S(r_e) * f_ext_interp(:, i) + tau_ext_interp(2, i)] + f_ext_hat) * dt_sim * delay_mbo; 
         % 1-order LPF
         f_ext_hat_sensored = k_mbo * (h - int_mbo - h_0);
         f_ext_hat = (dt_lpf * f_ext_hat + dt_sim * delay_mbo * f_ext_hat_sensored) / (dt_lpf + dt_sim * delay_mbo);
@@ -248,9 +318,7 @@ for i = 1:N_sim
         
         % SOCP
         f = [zeros(3*num_AMs, 1); 1; 1];
-        A_ineq = []; b_ineq = [];
-        A_eq = []; b_eq = [];
-
+        
         % External wrench compensation
         A_eq = zeros(6, 3*num_AMs + 2);
         r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
@@ -279,46 +347,33 @@ for i = 1:N_sim
             e_pd = (1 - X_error(:, j)).*Xd_quad - Xd_des_quad;
             
             feedback(3*j-2:3*j) = mj * Xdd_des_quad - kv_j *e_pd - kp_j * e_p;
-            v(3*j-2:3*j) = feedback(3*j-2:3*j) + mj * 9.81 * e_3; %TODO feed-back term
+            v(3*j-2:3*j) = feedback(3*j-2:3*j) + mj * 9.81 * e_3 - delta_n_interp(3*j-2:3*j, i); %TODO feed-back term
         end
         
         % inf-norm of v - delta
         socConstraints = [];
         for j = 1:num_AMs
             A_soc = [zeros(3, 3*(j-1)), eye(3), zeros(3, 3*(num_AMs-j)+2)];
-            b_soc = [v(3*j-2:3*j)];
+            b_soc = v(3*j-2:3*j);
             d_soc = [zeros(3*num_AMs,1); 1; 0];
             gamma = 0;
             socConstraints = [socConstraints, secondordercone(A_soc, b_soc, d_soc, gamma)];
         end
 
         % tilting angle constraint
-        % A1 = zeros(num_AMs, 3*num_AMs);
-        % A2 = zeros(num_AMs, 3*num_AMs);
-        % a1 = - e_1' + tan_max * e_3';
-        % a2 = e_1' + tan_max * e_3';
-        % for j = 1 : num_AMs
-        %     Rj = R * R_shape{j};
-        %     A1(j, 3*j-2:3*j) = a1 * Rj';
-        %     A2(j, 3*j-2:3*j) = a2 * Rj';
-        % end
-        % 
-        % A_ineq = [A1, zeros(num_AMs, 2);...
-        %           A2, zeros(num_AMs, 2)];
-        % b_ineq = [A1 * v; A2 * v];
-        
-        tan_max = 100;
-        for j = 1:1 % v - delta TODO
+        A1 = zeros(num_AMs, 3*num_AMs);
+        A2 = zeros(num_AMs, 3*num_AMs);
+        a1 = - e_1' + tan_max * e_3';
+        a2 = e_1' + tan_max * e_3';
+        for j = 1 : num_AMs
             Rj = R * R_shape{j};
-            A_ = [zeros(2, 3*(j-1)), [e_1' * Rj'; e_2' * Rj'], zeros(2, 3*(num_AMs-j)+2)];
-            d_ = [zeros(1, 3*(j-1)), tan_max * e_3' * Rj' , zeros(1, 3*(num_AMs-j)+2)];
-            A_soc = -A_;
-            b_soc = -A_ * [v; 0; 0];
-            d_soc = -d_';
-            gamma = -d_ * [v; 0; 0];
-            socConstraints = [socConstraints, secondordercone(A_soc, b_soc, d_soc, gamma)];
+            A1(j, 3*j-2:3*j) = a1 * Rj';
+            A2(j, 3*j-2:3*j) = a2 * Rj';
         end
-
+        
+        A_ineq = [A1, zeros(num_AMs, 2);...
+                  A2, zeros(num_AMs, 2)];
+        b_ineq = [A1 * (v); A2 * (v)];
         
         % inf-norm of internal force % TODO: torque check
         r_e = R * r_cj{1} + l1 * R * R_shape{1} * e_1;
@@ -326,7 +381,7 @@ for i = 1:N_sim
                  e_2 * f_ext_hat(4) - S(r_e) * f_ext_hat(1:3); zeros(3*num_AMs -3, 1)];
         qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
         Cqd = zeros(6*num_AMs) * qd;
-        F_int0 = A_dagger *([v; zeros(3*num_AMs, 1)] + F_ext - Cqd) + ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
+        F_int0 = A_dagger *([(v); zeros(3*num_AMs, 1)] + F_ext - Cqd) + ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
         A_delta = -A_dagger(:, 1:3*num_AMs);
         F_int_max = [f_int_max * ones(3*(num_AMs-1),1); tau_int_max * ones(3*(num_AMs-1),1)];
 
@@ -353,9 +408,9 @@ for i = 1:N_sim
         
         if exitflag == 1
             delta_prev = sol(1:3*num_AMs);
-            delta_pprev = delta_prev;
+            % delta_pprev = delta_prev;
             delta_reshape = reshape(sol(1:3*num_AMs), 3, num_AMs);
-            norms = sol(3*num_AMs+1 : end);
+            % norms = sol(3*num_AMs+1 : end);
         else
             disp(solver_output)
         end
@@ -364,7 +419,7 @@ for i = 1:N_sim
         delta_hatd = (dt_lpf_delta * delta_hatd + dt_sim * delay_mbo *delta_hatd_computed) / (dt_lpf + dt_sim * delay_mbo);
         delta_hat = [delta_reshape; zeros(1, num_AMs)];
 
-        internal_wrench = A_delta *  delta_prev + F_int0;
+        internal_wrench = A_delta * (delta_prev) + F_int0;
         internal_f_opt = internal_wrench(1:3*num_AMs-3);
         internal_tau_opt = internal_wrench(3*num_AMs-2 :end);
     end
@@ -395,14 +450,15 @@ for i = 1:N_sim
             e_pd = (1 - X_error(:, j)).*Xd_quad - Xd_des_quad;
             
             %TODO: sign of delta
-            e_pdd_hat = -9.81 * e_3 + (lambda_prev(j) * R_quad * e_3  + delta_hat(1:3, j)) / mj - Xdd_des_quad;
+            e_pdd_hat = -9.81 * e_3 + (lambda_prev(j) * R_quad * e_3  + delta_hat(1:3, j) + delta_n_interp(3*j-2:3*j, i)) / mj - Xdd_des_quad;
             %e_pdd_hat = (Xdd - Xdd_des(:, i))/dt_sim/delay_bs;
             
-            nu_ej    = lambda_prev(j) * R_quad * e_3 /mj - Xdd_des_quad + kv_j * e_pd / mj ...
-                    + kp_j * e_p / mj - 9.81 * e_3 + delta_hat(1:3, j) / mj;
+            nu_ej = lambda_prev(j) * R_quad * e_3 /mj - Xdd_des_quad + kv_j * e_pd / mj ...
+                    + kp_j * e_p / mj - 9.81 * e_3 + delta_hat(1:3, j) / mj + delta_n_interp(3*j-2:3*j, i) / mj;
             eta = - alpha * mj * nu_ej ...
                   - mj * gamma * (e_pd + epsilon * e_p);
-            vec = R_quad' * (eta + mj * Xddd_des_quad(:, j) - kv_j * e_pdd_hat - kp_j * e_pd - delta_hatd(1:3, j)); % delta_hatd
+            deltad_n = (delta_n_interp(3*j-2:3*j, i+1) - delta_n_interp(3*j-2:3*j, i))/dt_sim; 
+            vec = R_quad' * (eta + mj * Xddd_des_quad(:, j) - kv_j * e_pdd_hat - kp_j * e_pd - delta_hatd(1:3, j) - deltad_n); % delta_hatd
             w_xj_des = - vec(2) / lambda_prev(j);
             w_yj_des = vec(1) / lambda_prev(j);
             lambdad = vec(3);
@@ -497,7 +553,7 @@ for i = 1:N_sim
     disturb_sim(i,:) = disturb;
 
     %force_tot : sigma lambdai *Ri *e3
-    v_s = 0.001;
+
     f_fric = -M_o * 9.81* (mu_dyna * tanh(4 * Xd(1) / v_s) ...
        + (mu_st - mu_dyna) * Xd(1) /v_s /((Xd(1)/2/v_s)^2 + 0.75)^2 );
 
@@ -513,6 +569,8 @@ for i = 1:N_sim
     % else
     %      Xdd(1) = Xdd(1) - sign(Xd(1)) * mu_dyna * M_o * 9.81 / (M_o + AM_mass * mass_uncertainty);
     % end
+
+
 
     % tau_tot : sigma tau_i + tau_theta(1) + r x lambda
     wd = 0;  
@@ -743,15 +801,22 @@ legend(legend_entries)
 grid on
 
 subplot(4,1,3)
-plot(times, delta_hat_x_per_M_hist)
-title('$\frac{\Delta_{p,i}}{M_i} x $', 'Interpreter', 'latex','FontSize', 14)
-legend(legend_entries)
+hold on
+for j = 1:num_AMs
+    plot(times, delta_hat_x_per_M_hist(j, :) * m0, 'Color', colors(j,:))
+    % plot(times, delta_n_interp(3*j-2, :), "--", 'Color', colors(j, :))
+end
+title('$\delta_{i, x} $', 'Interpreter', 'latex','FontSize', 14)
 grid on
 
 subplot(4,1,4)
-plot(times, delta_hat_z_per_M_hist)
-title('$\frac{\Delta_{p,i}}{M_i} z $', 'Interpreter', 'latex','FontSize', 14)
-legend(legend_entries)
+hold on
+for j = 1:num_AMs
+    plot(times, delta_hat_z_per_M_hist(j, :) * m0, 'Color', colors(j,:))
+    % plot(times, delta_n_interp(3*j, :), "--", 'Color', colors(j, :))
+end
+title('$\delta_{i, z} $', 'Interpreter', 'latex','FontSize', 14)
+% legend(legend_entries)
 grid on
 
 %% End effector Error 

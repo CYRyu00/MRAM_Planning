@@ -76,8 +76,8 @@ kv_M = diag([kv_M, kv_M, kv_z]);
 kw_I = 10; % 10 or 20 or 100
 
 % servo moter
-kp_servo = 0.01; % 0.1 / 0.01
-kd_servo = 0.1; % 1.0 / 0.1 / 0.03
+kp_servo = 1e2; % 1e1
+kd_servo = 5e0; % 1e1
 damp_servo = 0.05; % 0.05
 
 % endeffector control
@@ -110,7 +110,7 @@ beta = 40;
 % Simulation Parmeters
 N_sim_tmp = 5000;
 show_video = true;
-save_video = true;
+save_video = false;
 video_speed = 1.0;
 
 % Thrust limit and w_des limit

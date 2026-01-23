@@ -42,7 +42,7 @@ function [qdd, f_in, tau_in] = FD_cart(p_o, phi, qd, U, M, k_obj, b_obj, l1, l2,
             A_tau_r(3*j-2:3*j, 3*j-2:3*j) = eye(3);
         else
             A_f_t(3*j-2:3*j, 3*j-2:3*j+3) = [eye(3), -eye(3)];
-            A_f_r(3*j-2:3*j, 3*j-2:3*j+3) = [l1*S(Rj*e_1), -l2*S(Rj*e_1)];
+            A_f_r(3*j-2:3*j, 3*j-2:3*j+3) = [l1*S(Rj*e_1), l2*S(Rj*e_1)];
             A_tau_r(3*j-2:3*j, 3*j-2:3*j+3) = [eye(3), -eye(3)];
         end
     end
@@ -56,7 +56,6 @@ function [qdd, f_in, tau_in] = FD_cart(p_o, phi, qd, U, M, k_obj, b_obj, l1, l2,
 
     qdd = M\ ([U_obj ; U] - A_T_lambda);
 end
-
 function out = Ry(q)
     out = [cos(q), 0, sin(q);
            0, 1, 0;

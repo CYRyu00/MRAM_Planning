@@ -60,12 +60,12 @@ for j = 2:n_am
     qd(1 + 3*j : 3 + 3*j) = pd_prev - l2*Ry(phi(j-1))*S(w_1)*e_1 - l1*Ry(phi(j))*S(w_1)*e_1 ;
 end
 
-U = [ones((n_am)*3, 1) * 00; ones(n_am*3, 1) * 0];
+U = [randn((n_am)*3, 1) * 3; randn((n_am)*3, 1) * 1];
+U = [repmat([10;1;1], n_am, 1); randn((n_am)*3, 1) * 0];
 
 [qdd, f_in, tau_in] = FD_cart(p_o, phi, qd, U, M, k_obj, b_obj, l1, l2, n_o, n_am);
 [qdd2, f_in2, tau_in2] = FD_cart_ver2(p_1, phi_1, pd_1, w_1, shape_pitch, r_g, U, M, k_obj, b_obj, l1, l2, n_o, n_am);
 qdd2
-
 %%
 function out = Ry(q)
     out = [cos(q), 0, sin(q);
