@@ -52,41 +52,50 @@ end
 J_tool_tot = J_c - num_AMs * J_quad;
 
 %% Set Parameters
+% control gains
 wn = 1; damp = 1.1; % 2, 1.1
 kp_M = wn^2; 
 kv_M = 2 * damp *sqrt(kp_M);
-
 wn = 1; damp = 1.1; % 2, 1.1
 kp_z = wn^2; 
 kv_z = 2 * damp *sqrt(kp_z);
-
 k_p = diag([kp_M, kp_M, kp_z]) * m_c;
 k_v = diag([kv_M, kv_M, kv_z]) * m_c;
 
 wn = 1; damp = 1.5; % 2, 1.1
 kR_M = wn^2; 
 kw_M = 2 * damp *sqrt(kR_M);
-
 k_R = diag([kR_M, kR_M, kR_M]) * J_c;
 k_w = diag([kw_M, kw_M, kw_M]) * J_c;
 
+beta_t = 10.0; % 10 ~ 100
+epsilon_t = 0.2 * k_v / m_c; % 0.2
+beta_r = 10.0; % 10 ~ 100
+epsilon_r = 0.2 * k_w / J_c;
+
 % servo moter
-kp_servo = 0.4 * 5 * 180 / pi; % 1.0Nm per 2.5 degree  [Nm/rad] 
+kp_servo = 0.4 * 1 * 180 / pi; %  0.4 * 5 * 180/pi : 1.0Nm per 2.5 degree  [Nm/rad] 
 kd_servo = kp_servo^0.5 * 1.2; % kp_servo^0.5 * 1.2 
 damp_servo = kd_servo * 0.2; % kd_servo * 0.2 
 
-% central controller
+% saturation parmeters
+thrust_limit = thrust_limit * 3.0; % 1 ~ 3
+w_des_limit = 2.0; % 2 ~ 1
 thetad_limit = 1.0;
+
+% central controller
 options = optimoptions('quadprog', ...
     'Algorithm', 'interior-point-convex', ...
     'Display', 'off', ...
     'OptimalityTolerance', 1e-5, ...
     'MaxIterations', 100, ...
     'ConstraintTolerance', 1e-5);
+lb = -thrust_limit * ones(4*num_AMs, 1);
+ub = thrust_limit * ones(4*num_AMs, 1);
 
 % Simulation Parmeters
 dt_sim = 0.001;
-N_sim = 20000;
+N_sim = 10000;
 show_video = true;
 save_video = false;
 video_speed = 1.0;
@@ -96,12 +105,8 @@ step_central_control = 1 /dt_sim /25; % 1/ dt_sim/ Hz
 step_config_opt = 1 /dt_sim /10;
 delay_communication = 0.02 / dt_sim; % 20ms
 
-% Thrust limit and w_des limit
-thrust_limit = thrust_limit * 3.0; % 1 ~ 3
-w_des_limit = 2.0; % 2 ~ 1
-
 % Disturbance, payload at EE
-payload = 0;
+payload = 0.0;
 rising_time = 3;
 mean = 0.0; max_val = 500.0;
 sigma = [1.0; 0; 1.0; 0; 0.5; 0] * payload * 9.81 * 0.0;
@@ -129,7 +134,7 @@ radius = 0.3;  v_z = 0.0;
 omega = 2 * pi * 0.2; 
 rpyd  = [0.00; -0.00; 0.0] * 2 * pi;
 X_hover = [0.1; 0; 0.3]; rpy_hover = [0, 10, 0] / 180 * pi; 
-% [X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
+[X_des, Xd_des, Xdd_des, Xddd_des, R_e_des, w_e_des, wd_e_des] = get_traj_helix_manip_2d(radius, omega, v_z, rpyd, X_hover, rpy_hover, N_sim, dt_sim);
 %% Simulation
 X = [0; 0; 0]; Xd = [0; 0; 0]; Xdd = [0; 0; 0];
 w = [0; 0; 0]; wd = [0; 0; 0];
@@ -146,8 +151,9 @@ X_hist = []; Xd_hist = []; R_hist = cell(N_sim, 1); w_hist = []; wd_hist = [];
 pitch_hist = []; pitch_des_hist = []; phi_q_hist = [];
 e_p_hist = []; e_d_hist = []; e_R_hist = []; e_w_hist = [];
 theta_hist = []; theta_ref_hist = []; theta_opt_hist = [];
-e_thetaj_hist = []; e_thetadj_hist = [];
+e_thetaj_hist = []; e_thetadj_hist = []; 
 thrusts_hist = [];
+wrench_ext_tilde_hist = [];
 times = [];
 
 tic
@@ -163,6 +169,7 @@ for i = 1:N_sim
     end
     if i == 1
         theta_ref(1, :) = theta;
+        wrench_ext_hat = zeros(6, 1); % [force; moment]
     end
     % estimation error
     X_error_dot = randn(3, num_AMs) * sigma_X;
@@ -181,12 +188,16 @@ for i = 1:N_sim
     if mod(i, step_central_control) == 1 || step_central_control == 1 
         e_p  = (1 - X_error(:, 1)).*X - X_des(:, i); 
         e_pd = (1 - X_error(:, 1)).*Xd - Xd_des(:, i);
-        force_des = m_c * Xdd_des(:, i) - k_p * e_p - k_v * e_pd + m_c * 9.81 * e_3;
+        force_ext_hatd = beta_t * (e_pd + epsilon_t * e_p);
+        wrench_ext_hat(1:3) = wrench_ext_hat(1:3) + force_ext_hatd * dt_sim * step_central_control; 
+        force_des = m_c * Xdd_des(:, i) - k_p * e_p - k_v * e_pd + m_c * 9.81 * e_3 - wrench_ext_hat(1:3);
         
         R_hat = R;
-        e_R =  0.5 * vee(R_e_des{i}' * R_hat - R_hat' * R_e_des{i});
+        e_R = 0.5 * vee(R_e_des{i}' * R_hat - R_hat' * R_e_des{i});
         e_w = (1 - w_error(:, 1)).* w - R_hat' * R_e_des{i} * w_e_des(:, i);
-        tau_des = J_c * wd_e_des(:, i) - k_R * e_R - k_w * e_w;
+        torque_ext_hatd = beta_r * (e_w + epsilon_r * e_R); %TODO
+        wrench_ext_hat(4:6) = wrench_ext_hat(4:6) + torque_ext_hatd * dt_sim * step_central_control; 
+        tau_des = J_c * wd_e_des(:, i) - k_R * e_R - k_w * e_w - wrench_ext_hat(4:6);
         
         % Thrusts Optimization - QP
         H = diag(ones(4*num_AMs, 1)); % 0.5 x' * H * x + f' * x
@@ -208,8 +219,7 @@ for i = 1:N_sim
         if i == 1
             sol_init = zeros(4*num_AMs, 1);
         end
-        lb = 0 * ones(4*num_AMs, 1);
-        ub = thrust_limit * ones(4*num_AMs, 1);
+
         
         [sol, fval, exitflag, output] = quadprog(H, f, A_ineq, b_ineq, A_eq, b_eq, lb, ub, sol_init, options);
         
@@ -323,6 +333,7 @@ for i = 1:N_sim
     phi_q_hist = [phi_q_hist, phi_q];
     theta_hist = [theta_hist, theta];
     theta_opt_hist = [theta_opt_hist, theta_opt];
+    wrench_ext_tilde_hist = [wrench_ext_tilde_hist, disturb - wrench_ext_hat];
 end
 toc
 %% State plot
@@ -418,6 +429,27 @@ legend({'$x$','$y$','$z$'},'Interpreter','latex','FontSize', 12);
 title('$e_w$', 'Interpreter', 'latex','FontSize', 14)
 %ylim([-1, 1])
 grid on
+
+% force_tilde
+subplot(3,2,5)
+hold on
+for j = 1:3
+    plot(times, wrench_ext_tilde_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+end
+legend({'$x$','$y$','$z$'},'Interpreter','latex','FontSize', 12);
+title('$\tilde{f}^{ext}$', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
+% tau_tilde
+subplot(3,2,6)
+hold on
+for j = 4:6
+    plot(times, wrench_ext_tilde_hist(j, :), 'Color', colors(j,:), 'LineWidth', 1.0);
+end
+legend({'$x$','$y$','$z$'},'Interpreter','latex','FontSize', 12);
+title('$\tilde\tau^{ext}$', 'Interpreter', 'latex','FontSize', 14)
+grid on
+
 %% force/disturbance
 figure('Position',[1350 550 500 400]);
 
@@ -436,7 +468,7 @@ colors = lines(6);
 subplot(3,1,1)
 hold on
 plot(times, theta_hist(1, :) / pi * 180, 'Color', colors(1,:), 'LineWidth', 1.0);
-plot(times, theta_ref(1:end-1, 1) / pi * 180, 'Color', colors(2,:), 'LineWidth', 1.0, 'LineStyle','--');
+plot(times, theta_ref(1:N_sim, 1) / pi * 180, 'Color', colors(2,:), 'LineWidth', 1.0, 'LineStyle','--');
 plot(times, theta_opt_hist(1, :) / pi * 180, 'Color', colors(3,:), 'LineWidth', 1.0, 'LineStyle',':');
 ylabel("[degree]")
 legend({'$\theta$','$\theta^{ref}$','$\theta^{opt}$'},'Interpreter','latex','FontSize', 12);
