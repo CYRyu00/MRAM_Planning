@@ -4,7 +4,7 @@ addpath("../../params")
 warning('off', 'MATLAB:nearlySingularMatrix');
 warning('off', 'MATLAB:illConditionedMatrix');
 %% parameters
-num_points = 100; % Number of points
+num_points = 500; % Number of points
 num_AMs = 5;
 
 params = define_params_ver2();
@@ -46,13 +46,13 @@ end
 thrust_min = 1e-2*-thrust_limit; %thrusts limit
 thrust_max = thrust_limit;
 %% optimization variables
-% theta0 = (2*rand(num_AMs, 1) - 1) * 5 / 180 * pi;
-theta0 = [1; 2; 3; 4; 5]/ 180 * pi;
+theta0 = (2*rand(num_AMs, 1) - 1) * 5 / 180 * pi;
+% theta0 = [1; 2; 3; 4; 5]/ 180 * pi;
 
-lb = -70 / 180 * pi * ones(num_AMs, 1);
-ub = 70 / 180 * pi * ones(num_AMs, 1);
+lb = -60 / 180 * pi * ones(num_AMs, 1);
+ub = 60 / 180 * pi * ones(num_AMs, 1);
 
-offset = [0; 0.6; 1]; % ty, fx, fz
+offset = [0; 0.3; 1]; % ty, fx, fz
 center_axis = offset;
 angle_deg = 5;
 num_samples = num_points;

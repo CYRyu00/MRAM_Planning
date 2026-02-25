@@ -110,10 +110,10 @@ function [obj, j] = low_cost(x)
 end
 
 function [g,h,gg,gh] = low_const(x)
-  g(1) = x(2:4)'*x(2:4)-900;
+  g(1) = x(2:4)'*x(2:4)-900;% g<=0
   g(2) = x(5:7)'*x(5:7)-900;
   g(3) = x(8:10)'*x(8:10)-900;
-  h = [];
+  h = []; % h = 0
 
   if nargout > 2
     gg = zeros(9,3);
