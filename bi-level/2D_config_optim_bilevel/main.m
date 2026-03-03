@@ -52,34 +52,30 @@ theta0 = (2*rand(num_AMs, 1) - 1) * 5 / 180 * pi;
 lb = -60 / 180 * pi * ones(num_AMs, 1);
 ub = 60 / 180 * pi * ones(num_AMs, 1);
 
-offset = [0; 0.3; 1]; % ty, fx, fz
+offset = [0; 1.0; 1]; % ty, fx, fz
 center_axis = offset;
-angle_deg = 5;
+angle_deg = 10;
 num_samples = num_points;
 bound_ratio = 0.7;
 U = sample_3d_cone_process(center_axis, angle_deg, num_samples, bound_ratio);
+beta = 1e0;
 %% gradient check 
 % checkGradients(@(theta)test_const(theta, num_AMs, f_min, f_max), theta0, Display="on", IsConstraint=true);
 %clc
-% [valid, err]=checkGradients(@(theta)high_cost(theta, U, num_AMs, num_points, thrust_min, thrust_max, R_shape, r_cj, B_tau, B_lambda), theta0, Display="on", IsConstraint=false);
+% [valid, err]=checkGradients(@(theta)high_cost_sparse(theta, beta, U, num_AMs, num_points, thrust_min, thrust_max, R_shape, r_cj, B_tau, B_lambda), theta0, Display="on", IsConstraint=false);
 %% 
 options = optimoptions('fmincon', ...
     'SpecifyObjectiveGradient', true, ...
-    'UseParallel', true, ...
-    'Display', 'iter-detailed', ...
+    'Display', 'final', ... % 'iter-detailed'
     'Algorithm', 'interior-point', ... % active-set, interior-point
     'HessianApproximation', 'lbfgs', ...
     'OptimalityTolerance', 1e-6, ...
     'ConstraintTolerance', 1e-6, ...
     'StepTolerance', 1e-6);
-% tic
-% [thetasol, fval, exflag, output, lambda, grad, hessian] = ...
-%   fmincon( @(theta)test_cost(theta, num_AMs, num_points), theta0, [], [], [], [], lb, ub, [], options);
-% toc
 
 tic
 [theta_opt, fval, exflag, output, lambda, grad, hessian] = ...
-  fmincon( @(theta)high_cost(theta, U, num_AMs, num_points, thrust_min, thrust_max, R_shape, r_cj, B_tau, B_lambda), theta0, [], [], [], [], lb, ub, [], options);
+  fmincon( @(theta)high_cost_sparse(theta, beta, U, num_AMs, num_points, thrust_min, thrust_max, R_shape, r_cj, B_tau, B_lambda), theta0, [], [], [], [], lb, ub, [], options);
 toc
 
 fprintf("\ntheta_opt : ")

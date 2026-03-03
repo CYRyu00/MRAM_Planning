@@ -313,7 +313,7 @@ for i = 1:N_sim_tmp
         qd = [zeros(3*num_AMs, 1); repmat(w, num_AMs, 1)];
         Cqd = zeros(6*num_AMs) * qd;
         F_int0 = A_dagger *([v; zeros(3*num_AMs, 1)] + F_ext - Cqd) + ((A* (M\ A')) \ Ad) * qd; % mge_3 doesn't generate internal forces;
-        A_delta = -A_dagger(:, 1:3*num_AMs);
+        % A_delta = -A_dagger(:, 1:3*num_AMs);
         F_int_max = [f_int_max * ones(3*(num_AMs-1),1); tau_int_max * ones(3*(num_AMs-1),1)];
 
         A_ineq = [A_ineq; A_delta, zeros(6*(num_AMs-1), 2);...
@@ -465,7 +465,7 @@ for i = 1:N_sim_tmp
         thetad(j) = wrapToPi(w_e_j(2) - phid(j));
         thetadd(j) = (thetad(j) - thetad_prev) / dt_sim;
         
-        input_real(3*j -2:3*j) = R_quad * [0; 0; lambda_j] + mass_ams(j) * gravity;
+        ew(3*j -2:3*j) = R_quad * [0; 0; lambda_j] + mass_ams(j) * gravity;
         input_real(3*(j+num_AMs) -2:3*(j+num_AMs)) = (tau_j - tau_theta(j)) * e_2;
         thrusts = [thrusts; thrust_j];
         force_per_M = [force_per_M; lambda_j / mj];

@@ -39,8 +39,8 @@ for j = 1:num_AMs
     r_cj{j} = r_0j{j} - AM_com;% p_com to j
 end
 
-theta_min = -10 / 180 * pi * ones(num_AMs, 1);
-theta_max = 10 / 180 * pi * ones(num_AMs, 1);
+theta_min = -60 / 180 * pi * ones(num_AMs, 1);
+theta_max = 60 / 180 * pi * ones(num_AMs, 1);
 
 thrust_min = 0* -thrust_limit * ones(4*num_AMs, 1);
 thrust_max = thrust_limit * ones(4*num_AMs, 1);
@@ -48,7 +48,7 @@ thrust_cen = (thrust_max + thrust_min)/2; % 4 x 1
 thrust_tilde = (thrust_max(1) - thrust_min(1))/2; % scalar
 %% fibonacci sphere
 offset = m_c* 9.81 * [0.0; 0.0; 1.0];
-num_points = 1000; % Number of points
+num_points = 500; % Number of points
 U = fibonacci_sphere(num_points); %  tau_y, fx, fz
 beta = 1e0; % 0.01 ~ 1.0
 k_diff = 1e0*num_AMs;
@@ -60,7 +60,7 @@ bound_ratio = 0.7;
 cone_samples = sample_3d_cone_process(target_axis, cone_angle, n_feas, bound_ratio)'; %  tau_y, fx, fz
 %% Determine Q
 v_major = offset / 9.81 / m_c;
-r_minor = 0.1;
+r_minor = 0.2;
 a = norm(v_major);
 n1 = v_major / a;
 
@@ -79,6 +79,7 @@ disp('생성된 Q^-1/2:');
 disp(inv_Q_half);
 % offset= [0;0;0];
 %% NLP SOLVER
+tic
 Theta = MX.sym('Theta', num_AMs, 1);
 f_feas = MX.sym('f_feas', 4*num_AMs, 1);
 weight = MX.sym('weight', 1, 1);
@@ -136,6 +137,7 @@ sol = solver('x0', opt_var0, ...
              'lbg', LBG, 'ubg', UBG);
 fprintf("\nsuccess : %d", solver.stats.success)
 fprintf("\nreturn_stauts : %s\n", solver.stats.return_status)
+toc
 %%
 solution = full(sol.x);
 opt_f = full(sol.f);
